@@ -28,6 +28,7 @@
 #include "libxl_internal.h"
 
 /* #define DEBUG_RECEIVED */
+/* #define LIBXL_BLK_STATS */
 
 #ifdef DEBUG_RECEIVED
 #  define DEBUG_REPORT_RECEIVED(buf, len) \
@@ -212,6 +213,7 @@ static int qmp_capabilities_callback(libxl__qmp_handler *qmp,
     return 0;
 }
 
+#ifdef LIBXL_BLK_STATS
 //add this temperary for compile
 struct __libxl_block_stats {
     char *dev_name;
@@ -299,10 +301,28 @@ static int qmp_get_blk_stats_callback(libxl__qmp_handler *qmp,
             //\TODO missing flush
         }
     };
-
     return ret;
 }
+#endif // #ifdef LIBXL_BLK_STATS
 
+static int qmp_test_callback(libxl__qmp_handler *qmp,
+                             const libxl__json_object *response,
+                             void *opaque)
+{
+    const libxl__json_object *obj = NULL;
+    const libxl__json_object *label = NULL;
+    const char *s = NULL;
+    int i = 0;
+    int ret = 0;
+
+    for (i = 0; (obj = libxl__json_array_get(response, i)); i++) {
+        if (!libxl__json_object_is_map(obj))
+            continue;
+        label = libxl__json_map_get("device", obj, JSON_STRING);
+        s = libxl__json_object_get_string(label);
+    };
+    return ret;
+}
 
 /*
  * QMP commands
@@ -1021,6 +1041,7 @@ int libxl__qmp_insert_cdrom(libxl__gc *gc, int domid,
     }
 }
 
+#ifdef LIBXL_BLK_STATS
 int libxl__qmp_query_blk_stats(libxl__gc *gc, int domid,
                                libxl_block_stats *block_stats)
 {
@@ -1029,6 +1050,17 @@ int libxl__qmp_query_blk_stats(libxl__gc *gc, int domid,
 
     return qmp_run_command(gc, domid, "query-blockstats", args,
                            qmp_get_blk_stats_callback, block_stats);
+}
+#endif // #ifdef LIBXL_BLK_STATS
+
+int libxl__qmp_test(libxl__gc *gc, int domid,
+                    const char* command)
+{
+    libxl__json_object *args = NULL;
+    int ret = 0;
+
+    return qmp_run_command(gc, domid, command, args,
+                           qmp_test_callback, NULL);
 }
 
 int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
