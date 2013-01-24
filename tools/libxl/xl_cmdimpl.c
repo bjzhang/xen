@@ -5656,8 +5656,7 @@ int main_blocklist(int argc, char **argv)
     return 0;
 }
 
-int main_blockdetach(int argc, char **argv)
-{
+int main_blockdetach(int argc, char **argv) {
     uint32_t domid;
     int opt, rc = 0;
     libxl_device_disk disk;
@@ -5677,6 +5676,28 @@ int main_blockdetach(int argc, char **argv)
         fprintf(stderr, "libxl_device_disk_remove failed.\n");
     }
     libxl_device_disk_dispose(&disk);
+    return rc;
+}
+
+int main_blockinfo(int argc, char **argv) {
+    uint32_t domid;
+    int opt, rc = 0;
+    libxl_block_stats stats;
+
+    if ((opt = def_getopt(argc, argv, "", "block-info", 2)) != -1)
+        return opt;
+
+    domid = find_domain(argv[optind]);
+
+    stats.dev_name = argv[optind+1];
+    if (libxl_query_blk_stats(ctx, domid, &stats)) {
+        fprintf(stderr, "Error\n");
+        return 1;
+    }
+    printf("%-5d %-8lu %-8lu %-8lu %-8lu %-8lu %-8lu %-8lu %-8lu \n",
+           stats.dev_name, stats.rd_req, stats.rd_bytes, stats.wr_req,
+           stats.bytes, stats.rd_total_times, stats.wr_total_times,
+           stats.flush_req, stats.flush_total_times);
     return rc;
 }
 
@@ -6993,6 +7014,20 @@ int main_remus(int argc, char **argv)
 
     close(send_fd);
     return -ERROR_FAIL;
+}
+
+int main_qmp(int argc, char **argv)
+{
+    uint32_t domid;
+    int opt = 0;
+
+    if ((opt = def_getopt(argc, argv, "", "qmp", 2)) != -1)
+        return opt;
+
+    domid = find_domain(argv[optind]);
+    libxl_qmp_test(ctx, domid, argv[optind+1]);
+
+    return 0;
 }
 
 /*

@@ -544,3 +544,17 @@ libxl_event = Struct("event",[
                                  ])),
            ("domain_create_console_available", Struct(None, [])),
            ]))])
+
+libxl_block_stats = Struct("block_stats",[
+    ("dev_name",          string),
+    ("rd_req",            uint64),
+    ("rd_bytes",          uint64),
+    ("wr_req",            uint64),
+    ("wr_bytes",          uint64),
+    ("rd_total_times",    uint64),
+    ("wr_total_times",    uint64),
+    ("flush_req",         uint64),
+    ("flush_total_times", uint64),
+    ])
+
+

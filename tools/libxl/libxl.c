@@ -5112,6 +5112,21 @@ int libxl_fd_set_cloexec(libxl_ctx *ctx, int fd, int cloexec)
 int libxl_fd_set_nonblock(libxl_ctx *ctx, int fd, int nonblock)
   { return fd_set_flags(ctx,fd, F_GETFL,F_SETFL,"FL", O_NONBLOCK, nonblock); }
 
+int libxl_query_blk_stats(libxl_ctx *ctx, int domid,
+                          libxl_block_stats *block_stats)
+{
+    GC_INIT(ctx);
+    libxl__qmp_query_blk_stats(gc, domid, block_stats);
+    GC_FREE;
+}
+
+int libxl_qmp_test(libxl_ctx *ctx, int domid, const char* command)
+{
+    GC_INIT(ctx);
+    libxl__qmp_test(gc, domid, command);
+    GC_FREE;
+}
+
 /*
  * Local variables:
  * mode: C

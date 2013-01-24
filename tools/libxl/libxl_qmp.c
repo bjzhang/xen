@@ -28,7 +28,6 @@
 #include "libxl_internal.h"
 
 /* #define DEBUG_RECEIVED */
-/* #define LIBXL_BLK_STATS */
 
 #ifdef DEBUG_RECEIVED
 #  define DEBUG_REPORT_RECEIVED(buf, len) \
@@ -213,21 +212,20 @@ static int qmp_capabilities_callback(libxl__qmp_handler *qmp,
     return 0;
 }
 
-#ifdef LIBXL_BLK_STATS
-//add this temperary for compile
-struct __libxl_block_stats {
-    char *dev_name;
-    long long rd_req;
-    long long rd_bytes;
-    long long wr_req;
-    long long wr_bytes;
-    long long rd_total_times;
-    long long wr_total_times;
-    long long flush_req;
-    long long flush_total_times;
-};
-typedef struct __libxl_block_stats _libxl_block_stats;
-typedef _libxl_block_stats libxl_block_stats;
+////add this temperary for compile
+//struct __libxl_block_stats {
+//    char *dev_name;
+//    long long rd_req;
+//    long long rd_bytes;
+//    long long wr_req;
+//    long long wr_bytes;
+//    long long rd_total_times;
+//    long long wr_total_times;
+//    long long flush_req;
+//    long long flush_total_times;
+//};
+//typedef struct __libxl_block_stats _libxl_block_stats;
+//typedef _libxl_block_stats libxl_block_stats;
 
 static int qmp_get_blk_stats_callback(libxl__qmp_handler *qmp,
                                       const libxl__json_object *response,
@@ -237,7 +235,7 @@ static int qmp_get_blk_stats_callback(libxl__qmp_handler *qmp,
     const libxl__json_object *label = NULL;
     const char *s = NULL;
     int i = 0;
-    libxl_block_stats block_stats = (libxl_block_stats)opaque;
+    libxl_block_stats *block_stats = (libxl_block_stats*)opaque;
 //    const char *chardev = NULL;
     int ret = 0;
 
@@ -259,35 +257,14 @@ static int qmp_get_blk_stats_callback(libxl__qmp_handler *qmp,
             char *endptr = NULL;
             int port_number;
 
-//        if ((stats = virJSONValueObjectGet(dev, "stats")) == NULL ||
-//        if (virJSONValueObjectGetNumberLong(stats, "rd_bytes", rd_bytes) < 0) {
-//        if (virJSONValueObjectGetNumberLong(stats, "rd_operations", rd_req) < 0) {
-//        if (rd_total_times &&
-//            virJSONValueObjectHasKey(stats, "rd_total_time_ns") &&
-//            (virJSONValueObjectGetNumberLong(stats, "rd_total_time_ns",
-//                                             rd_total_times) < 0)) {
-//        if (virJSONValueObjectGetNumberLong(stats, "wr_bytes", wr_bytes) < 0) {
-//        if (virJSONValueObjectGetNumberLong(stats, "wr_operations", wr_req) < 0) {
-//        if (wr_total_times &&
-//            virJSONValueObjectHasKey(stats, "wr_total_time_ns") &&
-//            (virJSONValueObjectGetNumberLong(stats, "wr_total_time_ns",
-//                                             wr_total_times) < 0)) {
-//        if (flush_req &&
-//            virJSONValueObjectHasKey(stats, "flush_operations") &&
-//            (virJSONValueObjectGetNumberLong(stats, "flush_operations",
-//                                            flush_req) < 0)) {
-//        if (flush_total_times &&
-//            virJSONValueObjectHasKey(stats, "flush_total_time_ns") &&
-//            (virJSONValueObjectGetNumberLong(stats, "flush_total_time_ns",
-//                                            flush_total_times) < 0)) {
             rd_bytes = libxl__json_map_get("rd_bytes", obj, JSON_STRING);
             block_stats->rd_bytes = libxl__json_object_get_string(rd_bytes);
 
             rd_operations = libxl__json_map_get("rd_operations", obj, JSON_STRING);
             block_stats->rd_operations = libxl__json_object_get_string(rd_operations);
 
-            rd_total_times = libxl__json_map_get("rd_total_times", obj, JSON_STRING);
-            block_stats->rd_total_times = libxl__json_object_get_string(rd_total_times);
+            rd_total_times = libxl__json_map_get("rd_total_times_ns", obj, JSON_STRING);
+            block_stats->rd_total_times = libxl__json_object_get_string(rd_total_times_ns);
 
             wr_bytes = libxl__json_map_get("wr_bytes", obj, JSON_STRING);
             block_stats->wr_bytes = libxl__json_object_get_string(wr_bytes);
@@ -295,15 +272,18 @@ static int qmp_get_blk_stats_callback(libxl__qmp_handler *qmp,
             wr_operations = libxl__json_map_get("wr_operations", obj, JSON_STRING);
             block_stats->wr_operations = libxl__json_object_get_string(wr_operations);
 
-            wr_total_times = libxl__json_map_get("wr_total_times", obj, JSON_STRING);
-            block_stats->wr_total_times = libxl__json_object_get_string(wr_total_times);
+            wr_total_times = libxl__json_map_get("wr_total_times_ns", obj, JSON_STRING);
+            block_stats->wr_total_times = libxl__json_object_get_string(wr_total_times_ns);
 
-            //\TODO missing flush
+            flush_operations = libxl__json_map_get("flush_operations", obj, JSON_STRING);
+            block_stats->flush_operations = libxl__json_object_get_string(flush_operations);
+
+            flush_total_times = libxl__json_map_get("flush_total_times_ns", obj, JSON_STRING);
+            block_stats->flush_total_times = libxl__json_object_get_string(flush_total_times_ns);
         }
     };
     return ret;
 }
-#endif // #ifdef LIBXL_BLK_STATS
 
 static int qmp_test_callback(libxl__qmp_handler *qmp,
                              const libxl__json_object *response,
@@ -1041,7 +1021,6 @@ int libxl__qmp_insert_cdrom(libxl__gc *gc, int domid,
     }
 }
 
-#ifdef LIBXL_BLK_STATS
 int libxl__qmp_query_blk_stats(libxl__gc *gc, int domid,
                                libxl_block_stats *block_stats)
 {
@@ -1051,7 +1030,6 @@ int libxl__qmp_query_blk_stats(libxl__gc *gc, int domid,
     return qmp_run_command(gc, domid, "query-blockstats", args,
                            qmp_get_blk_stats_callback, block_stats);
 }
-#endif // #ifdef LIBXL_BLK_STATS
 
 int libxl__qmp_test(libxl__gc *gc, int domid,
                     const char* command)

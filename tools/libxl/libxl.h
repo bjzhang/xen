@@ -943,6 +943,13 @@ int libxl_flask_loadpolicy(libxl_ctx *ctx, void *policy, uint32_t size);
 int libxl_fd_set_cloexec(libxl_ctx *ctx, int fd, int cloexec);
 int libxl_fd_set_nonblock(libxl_ctx *ctx, int fd, int nonblock);
 
+/* */
+/* get block stats */
+int libxl_query_blk_stats(libxl_ctx *ctx, int domid,
+                          libxl_block_stats *block_stats);
+/* run and get qmp result */
+int libxl_qmp_test(libxl_ctx *ctx, int domid, const char* command);
+
 #include <libxl_event.h>
 
 #endif /* LIBXL_H */

@@ -341,6 +341,11 @@ struct cmd_spec cmd_table[] = {
       "Destroy a domain's virtual block device",
       "<Domain> <DevId>",
     },
+    { "block-info",
+      &main_blockinfo, 0, 0,
+      "list the info of a domain's virtual block device",
+      "<Domain> <DevName>",
+    },
     { "vtpm-attach",
       &main_vtpmattach, 1, 1,
       "Create a new virtual TPM device",
@@ -477,6 +482,11 @@ struct cmd_spec cmd_table[] = {
       "-e                      Do not wait in the background (on <host>) for the death\n"
       "                        of the domain."
 
+    },
+    { "qmp",
+      &main_qmp, 0, 1,
+      "run the specific qmp command",
+      "<Domain> <Qmp command>",
     },
 };
 
