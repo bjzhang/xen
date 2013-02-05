@@ -5118,6 +5118,7 @@ int libxl_query_blk_stats(libxl_ctx *ctx, int domid,
     GC_INIT(ctx);
     libxl__qmp_query_blk_stats(gc, domid, block_stats);
     GC_FREE;
+    return 0;
 }
 
 int libxl_qmp_test(libxl_ctx *ctx, int domid, const char* command)
@@ -5125,6 +5126,7 @@ int libxl_qmp_test(libxl_ctx *ctx, int domid, const char* command)
     GC_INIT(ctx);
     libxl__qmp_test(gc, domid, command);
     GC_FREE;
+    return 0;
 }
 
 /*

@@ -248,38 +248,36 @@ static int qmp_get_blk_stats_callback(libxl__qmp_handler *qmp,
         if (s && strncmp(block_stats->dev_name, s, strlen(block_stats->dev_name)) == 0) {
             const libxl__json_object *rd_bytes = NULL;
             const libxl__json_object *rd_operations = NULL;
-            const libxl__json_object *rd_total_time_ns = NULL;
-            const libxl__json_object *wr_types = NULL;
+            const libxl__json_object *rd_total_times_ns = NULL;
+            const libxl__json_object *wr_bytes = NULL;
             const libxl__json_object *wr_operations = NULL;
-            const libxl__json_object *wr_total_time_ns = NULL;
+            const libxl__json_object *wr_total_times_ns = NULL;
             const libxl__json_object *flush_operations = NULL;
-            const libxl__json_object *flush_total_time_ns = NULL;
-            char *endptr = NULL;
-            int port_number;
+            const libxl__json_object *flush_total_times_ns = NULL;
 
             rd_bytes = libxl__json_map_get("rd_bytes", obj, JSON_STRING);
-            block_stats->rd_bytes = libxl__json_object_get_string(rd_bytes);
+            block_stats->rd_bytes = libxl__json_object_get_integer(rd_bytes);
 
             rd_operations = libxl__json_map_get("rd_operations", obj, JSON_STRING);
-            block_stats->rd_operations = libxl__json_object_get_string(rd_operations);
+            block_stats->rd_req = libxl__json_object_get_integer(rd_operations);
 
-            rd_total_times = libxl__json_map_get("rd_total_times_ns", obj, JSON_STRING);
-            block_stats->rd_total_times = libxl__json_object_get_string(rd_total_times_ns);
+            rd_total_times_ns = libxl__json_map_get("rd_total_times_ns", obj, JSON_STRING);
+            block_stats->rd_total_times = libxl__json_object_get_integer(rd_total_times_ns);
 
             wr_bytes = libxl__json_map_get("wr_bytes", obj, JSON_STRING);
-            block_stats->wr_bytes = libxl__json_object_get_string(wr_bytes);
+            block_stats->wr_bytes = libxl__json_object_get_integer(wr_bytes);
 
             wr_operations = libxl__json_map_get("wr_operations", obj, JSON_STRING);
-            block_stats->wr_operations = libxl__json_object_get_string(wr_operations);
+            block_stats->wr_req = libxl__json_object_get_integer(wr_operations);
 
-            wr_total_times = libxl__json_map_get("wr_total_times_ns", obj, JSON_STRING);
-            block_stats->wr_total_times = libxl__json_object_get_string(wr_total_times_ns);
+            wr_total_times_ns = libxl__json_map_get("wr_total_times_ns", obj, JSON_STRING);
+            block_stats->wr_total_times = libxl__json_object_get_integer(wr_total_times_ns);
 
             flush_operations = libxl__json_map_get("flush_operations", obj, JSON_STRING);
-            block_stats->flush_operations = libxl__json_object_get_string(flush_operations);
+            block_stats->flush_req = libxl__json_object_get_integer(flush_operations);
 
-            flush_total_times = libxl__json_map_get("flush_total_times_ns", obj, JSON_STRING);
-            block_stats->flush_total_times = libxl__json_object_get_string(flush_total_times_ns);
+            flush_total_times_ns = libxl__json_map_get("flush_total_times_ns", obj, JSON_STRING);
+            block_stats->flush_total_times = libxl__json_object_get_integer(flush_total_times_ns);
         }
     };
     return ret;
@@ -1025,7 +1023,6 @@ int libxl__qmp_query_blk_stats(libxl__gc *gc, int domid,
                                libxl_block_stats *block_stats)
 {
     libxl__json_object *args = NULL;
-    int ret = 0;
 
     return qmp_run_command(gc, domid, "query-blockstats", args,
                            qmp_get_blk_stats_callback, block_stats);
@@ -1035,7 +1032,6 @@ int libxl__qmp_test(libxl__gc *gc, int domid,
                     const char* command)
 {
     libxl__json_object *args = NULL;
-    int ret = 0;
 
     return qmp_run_command(gc, domid, command, args,
                            qmp_test_callback, NULL);

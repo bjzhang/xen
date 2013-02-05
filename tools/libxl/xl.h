@@ -79,6 +79,7 @@ int main_networkdetach(int argc, char **argv);
 int main_blockattach(int argc, char **argv);
 int main_blocklist(int argc, char **argv);
 int main_blockdetach(int argc, char **argv);
+int main_blockinfo(int argc, char **argv);
 int main_vtpmattach(int argc, char **argv);
 int main_vtpmlist(int argc, char **argv);
 int main_vtpmdetach(int argc, char **argv);
@@ -104,6 +105,7 @@ int main_getenforce(int argc, char **argv);
 int main_setenforce(int argc, char **argv);
 int main_loadpolicy(int argc, char **argv);
 int main_remus(int argc, char **argv);
+int main_qmp(int argc, char **argv);
 
 void help(const char *command);
 

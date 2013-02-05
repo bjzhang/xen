@@ -5694,9 +5694,9 @@ int main_blockinfo(int argc, char **argv) {
         fprintf(stderr, "Error\n");
         return 1;
     }
-    printf("%-5d %-8lu %-8lu %-8lu %-8lu %-8lu %-8lu %-8lu %-8lu \n",
+    printf("%-5s %-8lu %-8lu %-8lu %-8lu %-8lu %-8lu %-8lu %-8lu \n",
            stats.dev_name, stats.rd_req, stats.rd_bytes, stats.wr_req,
-           stats.bytes, stats.rd_total_times, stats.wr_total_times,
+           stats.wr_bytes, stats.rd_total_times, stats.wr_total_times,
            stats.flush_req, stats.flush_total_times);
     return rc;
 }
