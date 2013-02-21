@@ -245,7 +245,11 @@ static int qmp_get_blk_stats_callback(libxl__qmp_handler *qmp,
         label = libxl__json_map_get("device", obj, JSON_STRING);
         s = libxl__json_object_get_string(label);
 
-        if (s && strncmp(block_stats->dev_name, s, strlen(block_stats->dev_name)) == 0) {
+//        if (s && strncmp(block_stats->dev_name, s, strlen(block_stats->dev_name)) == 0) {
+        label = libxl__json_map_get("stats", obj, JSON_STRING);
+        obj=label;
+        s = libxl__json_object_get_string(label);
+        {
             const libxl__json_object *rd_bytes = NULL;
             const libxl__json_object *rd_operations = NULL;
             const libxl__json_object *rd_total_times_ns = NULL;

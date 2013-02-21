@@ -5684,8 +5684,9 @@ int main_blockinfo(int argc, char **argv) {
     int opt, rc = 0;
     libxl_block_stats stats;
 
-    if ((opt = def_getopt(argc, argv, "", "block-info", 2)) != -1)
-        return opt;
+    SWITCH_FOREACH_OPT(opt, "", NULL, "block-info", 2) {
+        /* No options */
+    }
 
     domid = find_domain(argv[optind]);
 
@@ -7021,8 +7022,9 @@ int main_qmp(int argc, char **argv)
     uint32_t domid;
     int opt = 0;
 
-    if ((opt = def_getopt(argc, argv, "", "qmp", 2)) != -1)
-        return opt;
+    SWITCH_FOREACH_OPT(opt, "", NULL, "qmp", 2) {
+        /* No options */
+    }
 
     domid = find_domain(argv[optind]);
     libxl_qmp_test(ctx, domid, argv[optind+1]);
