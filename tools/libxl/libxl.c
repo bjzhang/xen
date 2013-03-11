@@ -762,6 +762,7 @@ int libxl_domain_suspend(libxl_ctx *ctx, uint32_t domid, int fd, int flags,
     AO_CREATE(ctx, domid, ao_how);
     int rc;
 
+    LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "libxl_domain_suspend start");
     libxl_domain_type type = libxl__domain_type(gc, domid);
     if (type == LIBXL_DOMAIN_TYPE_INVALID) {
         rc = ERROR_FAIL;
@@ -781,6 +782,7 @@ int libxl_domain_suspend(libxl_ctx *ctx, uint32_t domid, int fd, int flags,
     dss->debug = flags & LIBXL_SUSPEND_DEBUG;
 
     libxl__domain_suspend(egc, dss);
+    LIBXL__LOG(CTX, LIBXL__LOG_DEBUG, "libxl_domain_suspend end");
     return AO_INPROGRESS;
 
  out_err:

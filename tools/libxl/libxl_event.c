@@ -20,7 +20,7 @@
 #include "libxl_internal.h"
 
 
-//#define DEBUG 1
+#define DEBUG 1
 
 #ifdef DEBUG
 # define LIBXL__DBG_LOG(ctx, args, ...) \

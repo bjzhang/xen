@@ -1215,6 +1215,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
     libxl__srm_save_autogen_callbacks *const callbacks =
         &dss->shs.callbacks.save.a;
 
+    LOG(DEBUG, "libxl__domain_suspend start");
     logdirty_init(&dss->logdirty);
 
     switch (type) {
@@ -1245,6 +1246,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
     dss->suspend_eventchn = -1;
     dss->guest_responded = 0;
     dss->dm_savefile = libxl__device_model_savefile(gc, domid);
+    LOG(DEBUG, "device model savefile<%s>", dss->dm_savefile);
 
     if (r_info != NULL) {
         dss->interval = r_info->interval;
@@ -1280,6 +1282,7 @@ void libxl__domain_suspend(libxl__egc *egc, libxl__domain_suspend_state *dss)
     dss->shs.callbacks.save.toolstack_save = libxl__toolstack_save;
 
     libxl__xc_domain_save(egc, dss, vm_generationid_addr);
+    LOG(DEBUG, "libxl__domain_suspend end");
     return;
 
  out:
