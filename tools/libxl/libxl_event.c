@@ -1202,6 +1202,7 @@ void libxl_event_register_callbacks(libxl_ctx *ctx,
 void libxl__event_occurred(libxl__egc *egc, libxl_event *event)
 {
     EGC_GC;
+    libxl_ctx *ctx = libxl__gc_owner(&egc->gc);
 
     if (CTX->event_hooks &&
         (CTX->event_hooks->event_occurs_mask & (1UL << event->type))) {
@@ -1209,10 +1210,12 @@ void libxl__event_occurred(libxl__egc *egc, libxl_event *event)
          * from libxl.  This helps avoid reentrancy bugs: parts of
          * libxl that call libxl__event_occurred do not have to worry
          * that libxl might be reentered at that point. */
+        LIBXL__LOG(ctx, XTL_DEBUG, "event_hooks exist");
         LIBXL_TAILQ_INSERT_TAIL(&egc->occurred_for_callback, event, link);
         return;
     } else {
         libxl__poller *poller;
+        LIBXL__LOG(ctx, XTL_DEBUG, "will insert event to ctx->occurred and call libxl_poller_wakeup");
         LIBXL_TAILQ_INSERT_TAIL(&CTX->occurred, event, link);
         LIBXL_LIST_FOREACH(poller, &CTX->pollers_event, entry)
             libxl__poller_wakeup(egc, poller);

@@ -237,7 +237,7 @@ static void helper_failed(libxl__egc *egc, libxl__save_helper_state *shs,
 {
     STATE_AO_GC(shs->ao);
 
-    LOG(DEBUG,"%s start", __FUNC__);
+    LOG(DEBUG,"%s start", __FUNCTION__);
     if (!shs->rc)
         shs->rc = rc;
 
@@ -358,7 +358,7 @@ void libxl__srm_callout_sendreply(int r, void *user)
     STATE_AO_GC(shs->ao);
     int errnoval;
 
-    LOG(DEBUG,"%s start", __FUNC__);
+    LOG(DEBUG,"%s start", __FUNCTION__);
     errnoval = libxl_write_exactly(CTX, libxl__carefd_fd(shs->pipes[0]),
                                    &r, sizeof(r), shs->stdin_what,
                                    "callback return value");
