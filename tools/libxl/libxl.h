@@ -319,13 +319,15 @@
 
 #include <xentoollog.h>
 
+typedef struct libxl__ctx libxl_ctx;
+
 #include <libxl_uuid.h>
 #include <_libxl_list.h>
 
 /* API compatibility. */
 #ifdef LIBXL_API_VERSION
 #if LIBXL_API_VERSION != 0x040200 && LIBXL_API_VERSION != 0x040300 && \
-    LIBXL_API_VERSION != 0x040400
+    LIBXL_API_VERSION != 0x040400 && LIBXL_API_VERSION != 0x040500
 #error Unknown LIBXL_API_VERSION
 #endif
 #endif
@@ -511,6 +513,14 @@
 #ifndef LIBXL_EXTERNAL_CALLERS_ONLY
 #define LIBXL_EXTERNAL_CALLERS_ONLY /* disappears for callers outside libxl */
 #endif
+
+/*
+ *  LIBXL_HAVE_UUID_COPY_CTX_PARAM
+ *
+ * If this is defined, libxl_uuid_copy has changed to take a libxl_ctx
+ * structure.
+ */
+#define LIBXL_HAVE_UUID_COPY_CTX_PARAM 1
 
 /*
  * LIBXL_HAVE_SSID_LABEL
