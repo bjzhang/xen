@@ -305,6 +305,7 @@ libxl_domain_build_info = Struct("domain_build_info",[
     ("avail_vcpus",     libxl_bitmap),
     ("cpumap",          libxl_bitmap),
     ("nodemap",         libxl_bitmap),
+    ("vcpu_affinity",   Array(libxl_bitmap, "num_vcpumaps")),
     ("numa_placement",  libxl_defbool),
     ("tsc_mode",        libxl_tsc_mode),
     ("max_memkb",       MemKB),

@@ -263,6 +263,20 @@ int libxl__build_pre(libxl__gc *gc, uint32_t domid,
     libxl_domain_set_nodeaffinity(ctx, domid, &info->nodemap);
     libxl_set_vcpuaffinity_all(ctx, domid, info->max_vcpus, &info->cpumap);
 
+    /* If we have vcpu affinity list, pin vcpu to pcpu. */
+    if (d_config->b_info.num_vcpumaps) {
+        int i;
+
+        for (i = 0; i < d_config->b_info.num_vcpumaps; i++) {
+            if (libxl_set_vcpuaffinity(ctx, domid, i,
+                                       &d_config->b_info.vcpu_affinity[i])) {
+                LIBXL__LOG(ctx, LIBXL__LOG_ERROR,
+                           "setting affinity failed on vcpu `%d'.", i);
+                return ERROR_FAIL;
+            }
+        }
+    }
+
     if (xc_domain_setmaxmem(ctx->xch, domid, info->target_memkb +
         LIBXL_MAXMEM_CONSTANT) < 0) {
         LIBXL__LOG_ERRNO(ctx, LIBXL__LOG_ERROR, "Couldn't set max memory");

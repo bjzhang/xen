@@ -331,6 +331,20 @@
 #endif
 
 /*
+ * LIBXL_HAVE_VCPU_AFFINITY_LIST
+ *
+ * If this is defined, then libxl_domain_build_info structure will
+ * contain vcpu_affinity, an array of libxl_bitmap that contains
+ * the necessary information to pin a VCPU to a PCPU. Libxl will try
+ * to pin VCPUs to PCPUs according to this list.
+ *
+ * The number of libxl_bitmap in the array equals to the maximum number
+ * of VCPUs. The size of each bitmap equals to the maximum number of
+ * PCPUs.
+ */
+#define LIBXL_HAVE_VCPU_AFFINITY_KEY_VALUE_LIST 1
+
+/*
  * LIBXL_HAVE_BUILDINFO_USBDEVICE_LIST
  *
  * If this is defined, then the libxl_domain_build_info structure will
