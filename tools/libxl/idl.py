@@ -142,6 +142,7 @@ class EnumerationValue(object):
 class Enumeration(Type):
     def __init__(self, typename, values, **kwargs):
         kwargs.setdefault('dispose_fn', None)
+        kwargs.setdefault('init_val', '0')
         Type.__init__(self, typename, **kwargs)
 
         self.value_namespace = kwargs.setdefault('value_namespace',
@@ -270,7 +271,7 @@ uint64 = UInt(64, json_gen_fn = "libxl__uint64_gen_json")
 
 string = Builtin("char *", namespace = None, dispose_fn = "free",
                  json_gen_fn = "libxl__string_gen_json",
-                 autogenerate_json = False)
+                 autogenerate_json = False, init_val = "NULL")
 
 class Array(Type):
     """An array of the same type"""

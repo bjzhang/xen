@@ -5,7 +5,8 @@
 
 namespace("libxl_")
 
-libxl_defbool = Builtin("defbool", passby=PASS_BY_REFERENCE)
+libxl_defbool = Builtin("defbool", passby=PASS_BY_REFERENCE,
+                        init_val="LIBXL__DEFBOOL_DEFAULT")
 
 libxl_domid = Builtin("domid", json_gen_fn = "yajl_gen_integer", autogenerate_json = False)
 libxl_devid = Builtin("devid", json_gen_fn = "yajl_gen_integer", autogenerate_json = False, signed = True, init_val="-1")

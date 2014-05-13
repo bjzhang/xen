@@ -135,7 +135,7 @@ def _libxl_C_type_init(ty, v, indent = "    ", parent = None, subinit=False):
             else:
                 s += _libxl_C_type_init(f.type, fexpr, "", nparent)
     else:
-        if ty.init_val is not None:
+        if ty.init_val is not None and ty.typename != "libxl_defbool":
             s += "%s = %s;\n" % (ty.pass_arg(v, parent is None), ty.init_val)
         elif ty.init_fn is not None:
             s += "%s(%s);\n" % (ty.init_fn, ty.pass_arg(v, parent is None))
@@ -206,6 +206,13 @@ def libxl_C_type_gen_map_key(f, parent, indent = ""):
         s = indent + s
     return s.replace("\n", "\n%s" % indent).rstrip(indent)
 
+def get_init_val(f):
+    if f.init_val is not None:
+        return f.init_val
+    elif f.type.init_val is not None:
+        return f.type.init_val
+    return None
+
 def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
     s = ""
     if parent is None:
@@ -255,8 +262,22 @@ def libxl_C_type_gen_json(ty, v, indent = "    ", parent = None):
         s += "    goto out;\n"
         for f in [f for f in ty.fields if not f.const and not f.type.private]:
             (nparent,fexpr) = ty.member(v, f, parent is None)
-            s += libxl_C_type_gen_map_key(f, nparent)
-            s += libxl_C_type_gen_json(f.type, fexpr, "", nparent)
+            init_val = get_init_val(f)
+            if init_val:
+                if f.type.typename != "libxl_defbool":
+                    s += "if (%s != %s) {\n" % (fexpr, init_val)
+                else:
+                    s += "if (%s.val != %s) {\n" % (fexpr, init_val)
+                indent1 = "    "
+            else:
+                indent1 = ""
+
+            s += libxl_C_type_gen_map_key(f, nparent, indent1)
+            s += libxl_C_type_gen_json(f.type, fexpr, indent1, nparent)
+
+            if init_val:
+                s += "}\n"
+
         s += "s = yajl_gen_map_close(hand);\n"
         s += "if (s != yajl_gen_status_ok)\n"
         s += "    goto out;\n"
