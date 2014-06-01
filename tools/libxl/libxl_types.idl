@@ -5,24 +5,29 @@
 
 namespace("libxl_")
 
-libxl_defbool = Builtin("defbool", json_parse_type="JSON_STRING", passby=PASS_BY_REFERENCE,
+libxl_defbool = Builtin("defbool", json_parse_type="JSON_STRING", passby=PASS_BY_REFERENCE, copy_fn=None,
                         init_val="LIBXL__DEFBOOL_DEFAULT")
-
 libxl_domid = Builtin("domid", json_gen_fn = "yajl_gen_integer", json_parse_fn = "libxl__uint32_parse_json",
-                      json_parse_type = "JSON_INTEGER", autogenerate_json = False)
+                      json_parse_type = "JSON_INTEGER", autogenerate_json = False, copy_fn=None)
 libxl_devid = Builtin("devid", json_gen_fn = "yajl_gen_integer", json_parse_fn = "libxl__int_parse_json",
-                      json_parse_type = "JSON_INTEGER", autogenerate_json = False, signed = True, init_val="-1")
-libxl_uuid = Builtin("uuid", json_parse_type="JSON_STRING", passby=PASS_BY_REFERENCE)
-libxl_mac = Builtin("mac", json_parse_type="JSON_STRING", passby=PASS_BY_REFERENCE)
-libxl_bitmap = Builtin("bitmap", json_parse_type="JSON_ARRAY", dispose_fn="libxl_bitmap_dispose", passby=PASS_BY_REFERENCE)
+                      json_parse_type = "JSON_INTEGER", autogenerate_json = False, signed = True, init_val="-1",
+                      copy_fn=None)
+libxl_uuid = Builtin("uuid", json_parse_type="JSON_STRING", passby=PASS_BY_REFERENCE, copy_fn="libxl_uuid_copy")
+libxl_mac = Builtin("mac", json_parse_type="JSON_STRING", passby=PASS_BY_REFERENCE, copy_fn="libxl_mac_copy")
+libxl_bitmap = Builtin("bitmap", json_parse_type="JSON_ARRAY", dispose_fn="libxl_bitmap_dispose",
+                       copy_fn='libxl_bitmap_copy_alloc', passby=PASS_BY_REFERENCE)
 libxl_cpuid_policy_list = Builtin("cpuid_policy_list", json_parse_type="JSON_ARRAY",
-                                  dispose_fn="libxl_cpuid_dispose", passby=PASS_BY_REFERENCE)
+                                  dispose_fn="libxl_cpuid_dispose", passby=PASS_BY_REFERENCE,
+                                  copy_fn="libxl_cpuid_policy_list_copy")
 
 libxl_string_list = Builtin("string_list", json_parse_type="JSON_ARRAY",
-                            dispose_fn="libxl_string_list_dispose", passby=PASS_BY_REFERENCE)
+                            dispose_fn="libxl_string_list_dispose", passby=PASS_BY_REFERENCE,
+                            copy_fn="libxl_string_list_copy")
 libxl_key_value_list = Builtin("key_value_list", json_parse_type="JSON_MAP",
-                               dispose_fn="libxl_key_value_list_dispose", passby=PASS_BY_REFERENCE)
-libxl_hwcap = Builtin("hwcap", json_parse_type="JSON_ARRAY", passby=PASS_BY_REFERENCE)
+                               dispose_fn="libxl_key_value_list_dispose", passby=PASS_BY_REFERENCE,
+                               copy_fn="libxl_key_value_list_copy")
+libxl_hwcap = Builtin("hwcap", json_parse_type="JSON_ARRAY", passby=PASS_BY_REFERENCE,
+                      copy_fn="libxl_hwcap_copy")
 
 #
 # Specific integer types
