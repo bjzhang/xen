@@ -66,8 +66,12 @@ class Type(object):
 
         if self.typename is not None and not self.private:
             self.json_gen_fn = kwargs.setdefault('json_gen_fn', self.typename + "_gen_json")
+            self.json_parse_type = kwargs.setdefault('json_parse_type', "JSON_ANY")
+            self.json_parse_fn = kwargs.setdefault('json_parse_fn', self.typename + "_parse_json")
         else:
             self.json_gen_fn = kwargs.setdefault('json_gen_fn', None)
+            self.json_parse_type = kwargs.setdefault('json_parse_type', None)
+            self.json_parse_fn = kwargs.setdefault('json_parse_fn', None)
 
         self.autogenerate_json = kwargs.setdefault('autogenerate_json', True)
 
@@ -119,6 +123,9 @@ class Number(Builtin):
         kwargs.setdefault('dispose_fn', None)
         kwargs.setdefault('signed', False)
         kwargs.setdefault('json_gen_fn', "yajl_gen_integer")
+        kwargs.setdefault('json_parse_type', "JSON_INTEGER")
+        # json_parse_fn might be overriden on specific type
+        kwargs.setdefault('json_parse_fn', "libxl__int_parse_json")
         self.signed = kwargs['signed']
         Builtin.__init__(self, ctype, **kwargs)
 
@@ -126,6 +133,7 @@ class UInt(Number):
     def __init__(self, w, **kwargs):
         kwargs.setdefault('namespace', None)
         kwargs.setdefault('dispose_fn', None)
+        kwargs.setdefault('json_parse_fn', "libxl__uint%d_parse_json" % w)
         Number.__init__(self, "uint%d_t" % w, **kwargs)
 
         self.width = w
@@ -143,6 +151,7 @@ class Enumeration(Type):
     def __init__(self, typename, values, **kwargs):
         kwargs.setdefault('dispose_fn', None)
         kwargs.setdefault('init_val', '0')
+        kwargs.setdefault('json_parse_type', "JSON_STRING")
         Type.__init__(self, typename, **kwargs)
 
         self.value_namespace = kwargs.setdefault('value_namespace',
@@ -172,6 +181,7 @@ class Field(object):
 class Aggregate(Type):
     """A type containing a collection of other types"""
     def __init__(self, kind, typename, fields, **kwargs):
+        kwargs.setdefault('json_parse_type', "JSON_MAP")
         Type.__init__(self, typename, **kwargs)
 
         if self.typename is not None:
@@ -258,6 +268,8 @@ class KeyedUnion(Aggregate):
 void = Builtin("void *", namespace = None)
 bool = Builtin("bool", namespace = None,
                json_gen_fn = "yajl_gen_bool",
+               json_parse_type = "JSON_BOOL",
+               json_parse_fn = "libxl__bool_parse_json",
                autogenerate_json = False)
 
 size_t = Number("size_t", namespace = None)
@@ -271,12 +283,15 @@ uint64 = UInt(64, json_gen_fn = "libxl__uint64_gen_json")
 
 string = Builtin("char *", namespace = None, dispose_fn = "free",
                  json_gen_fn = "libxl__string_gen_json",
+                 json_parse_type = "JSON_STRING | JSON_NULL",
+                 json_parse_fn = "libxl__string_parse_json",
                  autogenerate_json = False, init_val = "NULL")
 
 class Array(Type):
     """An array of the same type"""
     def __init__(self, elem_type, lenvar_name, **kwargs):
         kwargs.setdefault('dispose_fn', 'free')
+        kwargs.setdefault('json_parse_type', 'JSON_ARRAY')
         Type.__init__(self, namespace=elem_type.namespace, typename=elem_type.rawname + " *", **kwargs)
 
         lv_kwargs = dict([(x.lstrip('lenvar_'),y) for (x,y) in kwargs.items() if x.startswith('lenvar_')])
