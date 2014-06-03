@@ -716,6 +716,7 @@ static void initiate_domain_create(libxl__egc *egc,
     int i, ret;
     size_t last_devid = -1;
     bool pod_enabled = false;
+    libxl_domain_config d_config_saved;
 
     /* convenience aliases */
     libxl_domain_config *const d_config = dcs->guest_config;
@@ -723,6 +724,8 @@ static void initiate_domain_create(libxl__egc *egc,
     memset(&dcs->build_state, 0, sizeof(dcs->build_state));
 
     domid = 0;
+
+    libxl_domain_config_init(&d_config_saved);
 
     if (d_config->c_info.ssid_label) {
         char *s = d_config->c_info.ssid_label;
@@ -800,6 +803,8 @@ static void initiate_domain_create(libxl__egc *egc,
         goto error_out;
     }
 
+    libxl_domain_config_copy(ctx, &d_config_saved, d_config);
+
     ret = libxl__domain_create_info_setdefault(gc, &d_config->c_info);
     if (ret) goto error_out;
 
@@ -813,6 +818,15 @@ static void initiate_domain_create(libxl__egc *egc,
 
     dcs->guest_domid = domid;
     dcs->dmss.dm.guest_domid = 0; /* means we haven't spawned */
+
+    /* At this point we've got domid and UUID, store configuration */
+    ret = libxl__set_domain_configuration(gc, domid, &d_config_saved);
+    libxl_domain_config_dispose(&d_config_saved);
+    if (ret) {
+        LOGE(ERROR, "cannot store domain configuration: %d", ret);
+        ret = ERROR_FAIL;
+        goto error_out;
+    }
 
     ret = libxl__domain_build_info_setdefault(gc, &d_config->b_info);
     if (ret) goto error_out;
@@ -1356,6 +1370,62 @@ error_out:
     domcreate_complete(egc, dcs, ret);
 }
 
+static void update_domain_config(libxl__gc *gc,
+                                 libxl_domain_config *dst,
+                                 const libxl_domain_config *src)
+{
+    /* update network interface information */
+    int i;
+
+    for (i = 0; i < src->num_nics; i++)
+        libxl__update_config_nic(gc, &dst->nics[i], &src->nics[i]);
+
+    /* update vtpm information */
+    for (i = 0; i < src->num_vtpms; i++)
+        libxl__update_config_vtpm(gc, &dst->vtpms[i], &src->vtpms[i]);
+
+    /* update guest UUID */
+    libxl_uuid_copy(CTX, &dst->c_info.uuid, &src->c_info.uuid);
+
+    /* video ram */
+    dst->b_info.video_memkb = src->b_info.video_memkb;
+}
+
+/* update the saved domain configuration with a callback function,
+ * which is responsible to pull in useful fields from src.
+ */
+typedef void (update_callback)(libxl__gc *, libxl_domain_config *,
+                               const libxl_domain_config *);
+static int libxl__update_domain_configuration(libxl__gc *gc,
+                                              uint32_t domid,
+                                              update_callback callback,
+                                              const libxl_domain_config *src)
+{
+    libxl_domain_config d_config_saved;
+    int rc;
+
+    libxl_domain_config_init(&d_config_saved);
+
+    rc = libxl__get_domain_configuration(gc, domid, &d_config_saved);
+
+    if (rc) {
+        LOG(ERROR, "cannot get domain configuration: %d", rc);
+        goto out;
+    }
+
+    callback(gc, &d_config_saved, src);
+
+    rc = libxl__set_domain_configuration(gc, domid, &d_config_saved);
+
+    if (rc)
+        LOG(ERROR, "cannot set domain configuration: %d", rc);
+
+    libxl_domain_config_dispose(&d_config_saved);
+
+out:
+    return rc;
+}
+
 static void domcreate_complete(libxl__egc *egc,
                                libxl__domain_create_state *dcs,
                                int rc)
@@ -1365,6 +1435,12 @@ static void domcreate_complete(libxl__egc *egc,
 
     if (!rc && d_config->b_info.exec_ssidref)
         rc = xc_flask_relabel_domain(CTX->xch, dcs->guest_domid, d_config->b_info.exec_ssidref);
+
+    if (!rc) {
+        rc = libxl__update_domain_configuration(gc, dcs->guest_domid,
+                                                update_domain_config,
+                                                d_config);
+    }
 
     if (rc) {
         if (dcs->guest_domid) {

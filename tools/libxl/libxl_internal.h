@@ -3142,6 +3142,19 @@ int libxl__lock_domain_configuration(libxl__gc *gc, uint32_t domid,
 int libxl__unlock_domain_configuration(libxl__gc *gc, uint32_t domid,
                                        int *fd_lock);
 
+static inline void libxl__update_config_nic(libxl__gc *gc,
+                                            libxl_device_nic *dst,
+                                            libxl_device_nic *src)
+{
+    libxl_mac_copy(CTX, &dst->mac, &src->mac);
+}
+
+static inline void libxl__update_config_vtpm(libxl__gc *gc,
+                                             libxl_device_vtpm *dst,
+                                             libxl_device_vtpm *src)
+{
+    libxl_uuid_copy(CTX, &dst->uuid, &src->uuid);
+}
 
 #endif
 
