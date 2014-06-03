@@ -3121,6 +3121,16 @@ void libxl__numa_candidate_put_nodemap(libxl__gc *gc,
  */
 #define CTYPE(isfoo,c) (isfoo((unsigned char)(c)))
 
+/*
+ * Retrieve / store domain configuration from / to libxl private
+ * data store. The registry entry in libxl private data store
+ * is "libxl-json".
+ */
+int libxl__get_domain_configuration(libxl__gc *gc, uint32_t domid,
+                                    libxl_domain_config *d_config);
+int libxl__set_domain_configuration(libxl__gc *gc, uint32_t domid,
+                                    libxl_domain_config *d_config);
+
 
 #endif
 

@@ -1154,6 +1154,8 @@ void libxl_cpuid_set(libxl_ctx *ctx, uint32_t domid,
  *  "xl"          domain config file in xl format, Unix line endings
  *  "libvirt-xml" domain config file in libvirt XML format.  See
  *                http://libvirt.org/formatdomain.html
+ *  "libxl-json"  libxl_domain_config object in JSON format, generated
+ *                by libxl
  *
  * libxl does not enforce the registration of userdata userids or the
  * semantics of the data.  For specifications of the data formats

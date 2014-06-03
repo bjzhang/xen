@@ -375,6 +375,62 @@ out:
     return rc;
 }
 
+int libxl__get_domain_configuration(libxl__gc *gc, uint32_t domid,
+                                    libxl_domain_config *d_config)
+{
+    uint8_t *data = NULL;
+    int rc, len;
+
+    rc = libxl_userdata_retrieve(CTX, domid, "libxl-json", &data, &len);
+    if (rc) {
+        LOGEV(ERROR, rc,
+              "failed to retrieve domain configuration for domain %d", domid);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    if (len == 0) {
+        LOGE(ERROR, "configuration data stream empty for domain %d", domid);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+    rc = libxl_domain_config_from_json(CTX, d_config, (const char *)data);
+
+out:
+    free(data);
+    return rc;
+}
+
+int libxl__set_domain_configuration(libxl__gc *gc, uint32_t domid,
+                                    libxl_domain_config *d_config)
+{
+    char *d_config_json;
+    int rc;
+
+    d_config_json = libxl_domain_config_to_json(CTX, d_config);
+    if (!d_config_json) {
+        LOGE(ERROR, "failed to convert domain configuration to JSON for domain %d",
+             domid);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    rc = libxl_userdata_store(CTX, domid, "libxl-json",
+                              (const uint8_t *)d_config_json,
+                              strlen(d_config_json) + 1 /* include '\0' */);
+    if (rc) {
+        LOGEV(ERROR, rc, "failed to store domain configuration for domain %d",
+              domid);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+out:
+    free(d_config_json);
+    return rc;
+}
+
+
 /*
  * Local variables:
  * mode: C
