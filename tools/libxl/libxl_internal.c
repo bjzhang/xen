@@ -430,6 +430,82 @@ out:
     return rc;
 }
 
+int libxl__lock_domain_configuration(libxl__gc *gc, uint32_t domid,
+                                     int *fd_lock)
+{
+    int rc;
+    struct flock fl;
+    const char *lockfile;
+
+    if (*fd_lock >= 0)
+        return ERROR_INVAL;
+
+    lockfile = libxl__userdata_path(gc, domid, "libxl-json.lock", "d");
+    if (!lockfile)
+        return ERROR_FAIL;
+
+    *fd_lock = open(lockfile, O_WRONLY|O_CREAT, S_IWUSR);
+    if (*fd_lock < 0) {
+        LOGE(ERROR, "cannot open lockfile %s errno=%d\n", lockfile, errno);
+        return ERROR_FAIL;
+    }
+
+    if (fcntl(*fd_lock, F_SETFD, FD_CLOEXEC) < 0) {
+        close(*fd_lock);
+        LOGE(ERROR, "cannot set cloexec to lockfile %s errno=%d\n",
+             lockfile, errno);
+        return ERROR_FAIL;
+    }
+
+get_lock:
+    fl.l_type = F_WRLCK;
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0;
+    rc = fcntl(*fd_lock, F_SETLKW, &fl);
+    if (rc < 0 && errno == EINTR)
+        goto get_lock;
+
+    if (rc < 0) {
+        LOGE(ERROR, "cannot acquire lock %s errno=%d\n", lockfile, errno);
+        rc = ERROR_FAIL;
+    } else
+        rc = 0;
+
+    return rc;
+}
+
+int libxl__unlock_domain_configuration(libxl__gc *gc, uint32_t domid,
+                                       int *fd_lock)
+{
+    int rc;
+    struct flock fl;
+
+    if (*fd_lock < 0)
+        return ERROR_INVAL;
+
+release_lock:
+    fl.l_type = F_UNLCK;
+    fl.l_whence = SEEK_SET;
+    fl.l_start = 0;
+    fl.l_len = 0;
+    rc = fcntl(*fd_lock, F_SETLKW, &fl);
+    if (rc < 0 && errno == EINTR)
+        goto release_lock;
+
+    if (rc < 0) {
+        const char *lockfile;
+        lockfile = libxl__userdata_path(gc, domid, "libxl-json.lock", "d");
+        LOGE(ERROR, "cannot release lock %s, errno=%d\n", lockfile, errno);
+        rc = ERROR_FAIL;
+    } else
+        rc = 0;
+
+    close(*fd_lock);
+    *fd_lock = -1;
+
+    return rc;
+}
 
 /*
  * Local variables:

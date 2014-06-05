@@ -1754,9 +1754,9 @@ char *libxl__uuid2string(libxl__gc *gc, const libxl_uuid uuid)
     return GCSPRINTF(LIBXL_UUID_FMT, LIBXL_UUID_BYTES(uuid));
 }
 
-static const char *userdata_path(libxl__gc *gc, uint32_t domid,
-                                      const char *userdata_userid,
-                                      const char *wh)
+const char *libxl__userdata_path(libxl__gc *gc, uint32_t domid,
+                                 const char *userdata_userid,
+                                 const char *wh)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
     char *uuid_string;
@@ -1791,7 +1791,7 @@ void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid)
     glob_t gl;
     int r, i;
 
-    pattern = userdata_path(gc, domid, "*", "?");
+    pattern = libxl__userdata_path(gc, domid, "*", "?");
     if (!pattern)
         goto out;
 
@@ -1822,7 +1822,7 @@ int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
     int e, rc;
     int fd = -1;
 
-    filename = userdata_path(gc, domid, userdata_userid, "d");
+    filename = libxl__userdata_path(gc, domid, userdata_userid, "d");
     if (!filename) {
         rc = ERROR_NOMEM;
         goto out;
@@ -1833,7 +1833,7 @@ int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
         goto out;
     }
 
-    newfilename = userdata_path(gc, domid, userdata_userid, "n");
+    newfilename = libxl__userdata_path(gc, domid, userdata_userid, "n");
     if (!newfilename) {
         rc = ERROR_NOMEM;
         goto out;
@@ -1884,7 +1884,7 @@ int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
     int datalen = 0;
     void *data = 0;
 
-    filename = userdata_path(gc, domid, userdata_userid, "d");
+    filename = libxl__userdata_path(gc, domid, userdata_userid, "d");
     if (!filename) {
         rc = ERROR_NOMEM;
         goto out;

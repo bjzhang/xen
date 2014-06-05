@@ -993,6 +993,9 @@ _hidden int libxl__toolstack_restore(uint32_t domid, const uint8_t *buf,
                                      uint32_t size, void *data);
 _hidden int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid);
 
+_hidden const char *libxl__userdata_path(libxl__gc *gc, uint32_t domid,
+                                         const char *userdata_userid,
+                                         const char *wh);
 _hidden void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid);
 
 _hidden int libxl__domain_resume(libxl__gc *gc, uint32_t domid,
@@ -3130,6 +3133,14 @@ int libxl__get_domain_configuration(libxl__gc *gc, uint32_t domid,
                                     libxl_domain_config *d_config);
 int libxl__set_domain_configuration(libxl__gc *gc, uint32_t domid,
                                     libxl_domain_config *d_config);
+/*
+ * Lock / unlock domain configuration in libxl private data store.
+ * fd_lock contains the file descriptor pointing to the lock file.
+ */
+int libxl__lock_domain_configuration(libxl__gc *gc, uint32_t domid,
+                                     int *fd_lock);
+int libxl__unlock_domain_configuration(libxl__gc *gc, uint32_t domid,
+                                       int *fd_lock);
 
 
 #endif
