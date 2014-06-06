@@ -1905,18 +1905,20 @@ void libxl__device_vtpm_add(libxl__egc *egc, uint32_t domid,
     libxl__device *device;
     unsigned int rc;
 
-    rc = libxl__device_vtpm_setdefault(gc, vtpm);
-    if (rc) goto out;
-
-    front = flexarray_make(gc, 16, 1);
-    back = flexarray_make(gc, 16, 1);
-
     if (vtpm->devid == -1) {
         if ((vtpm->devid = libxl__device_nextid(gc, domid, "vtpm")) < 0) {
             rc = ERROR_FAIL;
             goto out;
         }
     }
+
+    DEVICE_ADD_JSON(vtpm, vtpms, num_vtpms, domid, vtpm, COMPARE_DEVID);
+
+    rc = libxl__device_vtpm_setdefault(gc, vtpm);
+    if (rc) goto out;
+
+    front = flexarray_make(gc, 16, 1);
+    back = flexarray_make(gc, 16, 1);
 
     GCNEW(device);
     rc = libxl__device_from_vtpm(gc, domid, vtpm, device);
@@ -2190,6 +2192,8 @@ static void device_disk_add(libxl__egc *egc, uint32_t domid,
         rc = ERROR_FAIL;
         goto out;
     }
+
+    DEVICE_ADD_JSON(disk, disks, num_disks, domid, disk, COMPARE_DISK);
 
     for (;;) {
         rc = libxl__xs_transaction_start(gc, &t);
@@ -3009,18 +3013,20 @@ void libxl__device_nic_add(libxl__egc *egc, uint32_t domid,
     libxl__device *device;
     unsigned int rc;
 
-    rc = libxl__device_nic_setdefault(gc, nic, domid);
-    if (rc) goto out;
-
-    front = flexarray_make(gc, 16, 1);
-    back = flexarray_make(gc, 18, 1);
-
     if (nic->devid == -1) {
         if ((nic->devid = libxl__device_nextid(gc, domid, "vif")) < 0) {
             rc = ERROR_FAIL;
             goto out;
         }
     }
+
+    DEVICE_ADD_JSON(nic, nics, num_nics, domid, nic, COMPARE_DEVID);
+
+    rc = libxl__device_nic_setdefault(gc, nic, domid);
+    if (rc) goto out;
+
+    front = flexarray_make(gc, 16, 1);
+    back = flexarray_make(gc, 18, 1);
 
     GCNEW(device);
     rc = libxl__device_from_nic(gc, domid, nic, device);

@@ -1047,6 +1047,8 @@ int libxl__device_pci_add(libxl__gc *gc, uint32_t domid, libxl_device_pci *pcide
         }
     }
 
+    DEVICE_ADD_JSON(pci, pcidevs, num_pcidevs, domid, pcidev, COMPARE_PCI);
+
     rc = libxl__device_pci_setdefault(gc, pcidev);
     if (rc) goto out;
 
