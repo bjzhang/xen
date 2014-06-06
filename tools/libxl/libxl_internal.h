@@ -2105,6 +2105,8 @@ struct libxl__ao_device {
     const char *what;
     int num_exec;
     libxl__ev_child child;
+    /* point to libxl_device_TYPE */
+    void *pdev;
 };
 
 /*
@@ -3214,6 +3216,32 @@ static inline void libxl__update_config_vtpm(libxl__gc *gc,
         libxl_device_##type##_copy(CTX, p, (dev));                      \
                                                                         \
     unlock:                                                             \
+        SET_CONFIG_AND_UNLOCK(domid, &d_config, &lock);                 \
+    } while (0)
+
+#define DEVICE_REMOVE_JSON(type, ptr, cnt, domid, dev, compare)         \
+    do {                                                                \
+        int i, j, lock = -1;                                            \
+        libxl_device_##type *p = dev;                                   \
+        libxl_domain_config d_config;                                   \
+                                                                        \
+        LOCK_AND_GET_CONFIG(domid, &d_config, &lock);                   \
+                                                                        \
+        for (i = j = 0; i < d_config.cnt; i++) {                        \
+            if (!compare(&d_config.ptr[i], p)) {                        \
+                if (i != j) {                                           \
+                    libxl_device_##type##_dispose(&d_config.ptr[j]);    \
+                    d_config.ptr[j] = d_config.ptr[i];                  \
+                }                                                       \
+                j++;                                                    \
+            }                                                           \
+        }                                                               \
+                                                                        \
+        d_config.ptr =                                                  \
+            libxl__realloc(gc, d_config.ptr,                            \
+                           j * sizeof(libxl_device_##type));            \
+        d_config.cnt = j;                                               \
+                                                                        \
         SET_CONFIG_AND_UNLOCK(domid, &d_config, &lock);                 \
     } while (0)
 

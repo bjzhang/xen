@@ -1822,7 +1822,7 @@ out:
     return;
 }
 
-#define DEFINE_DEVICE_RM_AOCOMPLETE(type)                               \
+#define DEFINE_DEVICE_RM_AOCOMPLETE(type, ptr, cnt, compare)            \
     static void device_##type##_rm_aocomplete(libxl__egc *egc,          \
                                               libxl__ao_device *aodev)  \
     {                                                                   \
@@ -1830,17 +1830,21 @@ out:
         if (aodev->rc) {                                                \
             DEVICE_AO_FAILED_MSG;                                       \
             goto out;                                                   \
+        } else {                                                        \
+            int rc;                                                     \
+            DEVICE_REMOVE_JSON(type, ptr, cnt, aodev->dev->domid,       \
+                               aodev->pdev, compare);                   \
         }                                                               \
                                                                         \
     out:                                                                \
         libxl__ao_complete(egc, ao, aodev->rc);                         \
     }
 
-DEFINE_DEVICE_RM_AOCOMPLETE(vtpm);
-DEFINE_DEVICE_RM_AOCOMPLETE(nic);
-DEFINE_DEVICE_RM_AOCOMPLETE(disk);
-DEFINE_DEVICE_RM_AOCOMPLETE(vfb);
-DEFINE_DEVICE_RM_AOCOMPLETE(vkb);
+DEFINE_DEVICE_RM_AOCOMPLETE(vtpm, vtpms, num_vtpms, COMPARE_DEVID);
+DEFINE_DEVICE_RM_AOCOMPLETE(nic, nics, num_nics, COMPARE_DEVID);
+DEFINE_DEVICE_RM_AOCOMPLETE(disk, disks, num_disks, COMPARE_DISK);
+DEFINE_DEVICE_RM_AOCOMPLETE(vfb, vfbs, num_vfbs, COMPARE_DEVID);
+DEFINE_DEVICE_RM_AOCOMPLETE(vkb, vkbs, num_vkbs, COMPARE_DEVID);
 
 /* common function to get next device id */
 static int libxl__device_nextid(libxl__gc *gc, uint32_t domid, char *device)
@@ -3592,6 +3596,7 @@ out:
                                                                         \
         GCNEW(aodev);                                                   \
         libxl__prepare_ao_device(ao, aodev);                            \
+        aodev->pdev = type;                                             \
         aodev->action = LIBXL__DEVICE_ACTION_REMOVE;                    \
         aodev->dev = device;                                            \
         aodev->callback = device_##type##_rm_aocomplete;                \

@@ -1333,6 +1333,12 @@ int libxl_device_pci_remove(libxl_ctx *ctx, uint32_t domid,
 
     rc = libxl__device_pci_remove_common(gc, domid, pcidev, 0);
 
+    if (!rc) {
+        DEVICE_REMOVE_JSON(pci, pcidevs, num_pcidevs, domid,
+                           pcidev, COMPARE_PCI);
+    }
+
+out:
     libxl__ao_complete(egc, ao, rc);
     return AO_INPROGRESS;
 }
