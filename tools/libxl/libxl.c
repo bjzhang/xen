@@ -2580,8 +2580,9 @@ int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
     return 0;
 }
 
-int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
-                       const libxl_asyncop_how *ao_how)
+static int libxl__cdrom_insert(libxl_ctx *ctx, uint32_t domid,
+                               libxl_device_disk *disk,
+                               const libxl_asyncop_how *ao_how)
 {
     AO_CREATE(ctx, domid, ao_how);
     int num = 0, i;
@@ -2690,6 +2691,41 @@ out:
 
     if (rc) return AO_ABORT(rc);
     return AO_INPROGRESS;
+}
+
+/*
+ * A "cdrom insert" is always processed as "eject" + "insert", with
+ * updating JSON in between. So that we can know the current state of
+ * CDROM later when we try to retrieve domain configuration: if
+ * xenstore is "empty", then CDROM is "empty"; otherwise use the image
+ * in JSON.
+ */
+int libxl_cdrom_insert(libxl_ctx *ctx, uint32_t domid, libxl_device_disk *disk,
+                       const libxl_asyncop_how *ao_how)
+{
+    GC_INIT(ctx);
+    libxl_device_disk empty;
+    int rc;
+
+    libxl_device_disk_init(&empty);
+    empty.format = LIBXL_DISK_FORMAT_EMPTY;
+    empty.vdev = libxl__strdup(NOGC, disk->vdev);
+    empty.is_cdrom = 1;
+
+    rc = libxl__cdrom_insert(ctx, domid, &empty, NULL);
+    if (rc)
+        goto out;
+
+    DEVICE_UPDATE_JSON(disk, disks, num_disks, domid, disk, COMPARE_DISK);
+
+    rc = libxl__cdrom_insert(ctx, domid, disk, ao_how);
+    if (rc)
+        goto out;
+
+out:
+    libxl_device_disk_dispose(&empty);
+    GC_FREE;
+    return rc;
 }
 
 /* libxl__alloc_vdev only works on the local domain, that is the domain

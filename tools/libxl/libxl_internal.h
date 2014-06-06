@@ -3245,6 +3245,25 @@ static inline void libxl__update_config_vtpm(libxl__gc *gc,
         SET_CONFIG_AND_UNLOCK(domid, &d_config, &lock);                 \
     } while (0)
 
+#define DEVICE_UPDATE_JSON(type, ptr, cnt, domid, dev, compare)         \
+    do {                                                                \
+        int lock = -1;                                                  \
+        int x;                                                          \
+        libxl_domain_config d_config;                                   \
+                                                                        \
+        LOCK_AND_GET_CONFIG(domid, &d_config, &lock);                   \
+                                                                        \
+        for (x = 0; x < d_config.cnt; x++) {                            \
+            if (compare(&d_config.ptr[x], (dev))) {                     \
+                libxl_device_##type##_dispose(&d_config.ptr[x]);        \
+                libxl_device_##type##_copy(CTX, &d_config.ptr[x],       \
+                                           (dev));                      \
+            }                                                           \
+        }                                                               \
+                                                                        \
+        SET_CONFIG_AND_UNLOCK(domid, &d_config, &lock);                 \
+    } while (0)
+
 #endif
 
 /*
