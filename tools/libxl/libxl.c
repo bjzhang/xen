@@ -5826,6 +5826,185 @@ void libxl_mac_copy(libxl_ctx *ctx, libxl_mac *dst, libxl_mac *src)
     for (i = 0; i < 6; i++)
         (*dst)[i] = (*src)[i];
 }
+
+int libxl_retrieve_domain_configuration(libxl_ctx *ctx, uint32_t domid,
+                                        libxl_domain_config *d_config)
+{
+    GC_INIT(ctx);
+    int rc;
+    int fd_lock = -1;
+
+    if (!libxl_domid_valid_guest(domid)) {
+        rc = ERROR_INVAL;
+        goto out;
+    }
+
+    rc = libxl__lock_domain_configuration(gc, domid, &fd_lock);
+    if (rc) {
+        LOGE(ERROR, "fail to lock domain configuration for domain %d", domid);
+        rc = ERROR_FAIL;
+        goto out;
+    }
+
+    rc = libxl__get_domain_configuration(gc, domid, d_config);
+    if (rc) {
+        LOGE(ERROR, "fail to get domain configuration for domain %d", domid);
+        rc = ERROR_FAIL;
+        goto out_unlock;
+    }
+
+    /* Domain name */
+    {
+        char *domname;
+        domname = libxl_domid_to_name(ctx, domid);
+        if (!domname) {
+            LOGE(ERROR, "fail to get domain name for domain %d", domid);
+            goto out_unlock;
+        }
+        free(d_config->c_info.name);
+        d_config->c_info.name = domname; /* steals allocation */
+    }
+
+    /* Domain UUID */
+    {
+        libxl_dominfo info;
+        rc = libxl_domain_info(ctx, &info, domid);
+        if (rc) {
+            LOGE(ERROR, "fail to get domain info for domain %d", domid);
+            goto out_unlock;
+        }
+        libxl_uuid_copy(ctx, &d_config->c_info.uuid, &info.uuid);
+    }
+
+    /* Memory target */
+    {
+        uint32_t target;
+        rc = libxl_get_memory_target(ctx, domid, &target);
+        if (rc) {
+            LOGE(ERROR, "fail to get memory target for domain %d", domid);
+            goto out_unlock;
+        }
+        /* The target memory in xenstore is smaller than what user has
+         * asked for. The difference is video_memkb, so add it
+         * back. Otherwise domain rebuild will fail.
+         */
+        if (d_config->b_info.type == LIBXL_DOMAIN_TYPE_HVM)
+            d_config->b_info.target_memkb =
+                target + d_config->b_info.video_memkb;
+
+        /* As for max_memkb we should really use the one in JSON
+         * because the one hypervisor has might be different from the
+         * value xenstore. Using hypervisor one will break HVM save /
+         * restore.
+         */
+    }
+
+    /* Devices: disk, nic, vtpm, pcidev */
+
+    /* The MERGE macro implements following logic:
+     * 0. retrieve JSON
+     * 1. retrieve list of device from xenstore
+     * 2. use xenstore entries as primary reference and compare JSON
+     *    entries with them.
+     *    a. if a device is present in xenstore and in JSON, merge the
+     *       two views.
+     *    b. if a device is not present in xenstore but in JSON, delete
+     *       it from the result.
+     *    c. it's impossible to have an entry present in xenstore but
+     *       not in JSON, because we maintain an invariant that every
+     *       entry in xenstore must have a corresponding entry in JSON.
+     * 3. "merge" operates on "src" and "dst". "src" points to the
+     *    entry retrieved from xenstore while "dst" points to the entry
+     *    retrieve from JSON.
+     */
+#define MERGE(type, ptr, cnt, compare, merge)                           \
+    do {                                                                \
+        libxl_device_##type *p = NULL;                                  \
+        int i, j, num;                                                  \
+                                                                        \
+        p = libxl_device_##type##_list(CTX, domid, &num);               \
+        if (p == NULL) {                                                \
+            LOGE(DEBUG,                                                 \
+                 "no %s from xenstore for domain %d",                   \
+                 #type, domid);                                         \
+        }                                                               \
+                                                                        \
+        for (i = 0; i < d_config->cnt; i++) {                           \
+            libxl_device_##type *q = &d_config->ptr[i];                 \
+            for (j = 0; j < num; j++) {                                 \
+                if (compare(&p[j], q))                                  \
+                    break;                                              \
+            }                                                           \
+                                                                        \
+            if (j < num) {         /* found in xenstore */              \
+                libxl_device_##type *dst, *src;                         \
+                dst = q;                                                \
+                src = &p[j];                                            \
+                merge;                                                  \
+            } else {                /* not found in xenstore */         \
+                LOGE(WARN, "Device present in JSON but not in xenstore, ignored"); \
+                                                                        \
+                libxl_device_##type##_dispose(q);                       \
+                                                                        \
+                for (j = i; j < d_config->cnt - 1; j++)                 \
+                    memcpy(&d_config->ptr[j], &d_config->ptr[j+1],      \
+                           sizeof(libxl_device_##type));                \
+                                                                        \
+                d_config->ptr =                                         \
+                    libxl__realloc(NOGC, d_config->ptr,                 \
+                                   sizeof(libxl_device_##type) *        \
+                                   (d_config->cnt - 1));                \
+                                                                        \
+                /* rewind counters */                                   \
+                d_config->cnt--;                                        \
+                i--;                                                    \
+            }                                                           \
+        }                                                               \
+                                                                        \
+        for (i = 0; i < num; i++)                                       \
+            libxl_device_##type##_dispose(&p[i]);                       \
+        free(p);                                                        \
+    } while (0);
+
+    MERGE(nic, nics, num_nics, COMPARE_DEVID, {
+            libxl__update_config_nic(gc, dst, src);
+        });
+
+    MERGE(vtpm, vtpms, num_vtpms, COMPARE_DEVID, {
+            libxl__update_config_vtpm(gc, dst, src);
+        });
+
+    MERGE(pci, pcidevs, num_pcidevs, COMPARE_PCI, {});
+
+    /* Take care of removable device:
+     * 1. if xenstore is "empty" while JSON is not, the result
+     *    is "empty"
+     * 2. if xenstore has a different media than JSON, use the
+     *    one in JSON
+     * 3. if xenstore and JSON have the same media, well, you
+     *    know the answer :-)
+     */
+    MERGE(disk, disks, num_disks, COMPARE_DISK, {
+            if (src->removable) {
+                if (!src->pdev_path || *src->pdev_path == '\0') {
+                    /* 1, use "empty" */
+                    free(dst->pdev_path);
+                    dst->pdev_path = libxl__strdup(NOGC, "");
+                    dst->format = LIBXL_DISK_FORMAT_EMPTY;
+                } else {
+                    /* 2 and 3, use JSON, don't need to touch anything */
+                    ;
+                }
+            }
+        });
+
+out_unlock:
+    rc = libxl__unlock_domain_configuration(gc, domid, &fd_lock);
+out:
+    GC_FREE;
+    return rc;
+}
+
 /*
  * Local variables:
  * mode: C
