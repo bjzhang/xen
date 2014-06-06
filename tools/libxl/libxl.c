@@ -1794,22 +1794,26 @@ out:
 }
 
 /******************************************************************************/
+#define DEVICE_AO_FAILED_MSG                                            \
+    do {                                                                \
+        if (aodev->dev) {                                               \
+            LOG(ERROR, "unable to %s %s with id %u",                    \
+            libxl__device_action_to_string(aodev->action),              \
+            libxl__device_kind_to_string(aodev->dev->kind),             \
+            aodev->dev->devid);                                         \
+        } else {                                                        \
+            LOG(ERROR, "unable to %s device",                           \
+                libxl__device_action_to_string(aodev->action));         \
+        }                                                               \
+    } while (0)
 
 /* generic callback for devices that only need to set ao_complete */
-static void device_addrm_aocomplete(libxl__egc *egc, libxl__ao_device *aodev)
+static void device_add_aocomplete(libxl__egc *egc, libxl__ao_device *aodev)
 {
     STATE_AO_GC(aodev->ao);
 
     if (aodev->rc) {
-        if (aodev->dev) {
-            LOG(ERROR, "unable to %s %s with id %u",
-                        libxl__device_action_to_string(aodev->action),
-                        libxl__device_kind_to_string(aodev->dev->kind),
-                        aodev->dev->devid);
-        } else {
-            LOG(ERROR, "unable to %s device",
-                       libxl__device_action_to_string(aodev->action));
-        }
+        DEVICE_AO_FAILED_MSG;
         goto out;
     }
 
@@ -1817,6 +1821,26 @@ out:
     libxl__ao_complete(egc, ao, aodev->rc);
     return;
 }
+
+#define DEFINE_DEVICE_RM_AOCOMPLETE(type)                               \
+    static void device_##type##_rm_aocomplete(libxl__egc *egc,          \
+                                              libxl__ao_device *aodev)  \
+    {                                                                   \
+        STATE_AO_GC(aodev->ao);                                         \
+        if (aodev->rc) {                                                \
+            DEVICE_AO_FAILED_MSG;                                       \
+            goto out;                                                   \
+        }                                                               \
+                                                                        \
+    out:                                                                \
+        libxl__ao_complete(egc, ao, aodev->rc);                         \
+    }
+
+DEFINE_DEVICE_RM_AOCOMPLETE(vtpm);
+DEFINE_DEVICE_RM_AOCOMPLETE(nic);
+DEFINE_DEVICE_RM_AOCOMPLETE(disk);
+DEFINE_DEVICE_RM_AOCOMPLETE(vfb);
+DEFINE_DEVICE_RM_AOCOMPLETE(vkb);
 
 /* common function to get next device id */
 static int libxl__device_nextid(libxl__gc *gc, uint32_t domid, char *device)
@@ -3564,7 +3588,7 @@ out:
         libxl__prepare_ao_device(ao, aodev);                            \
         aodev->action = LIBXL__DEVICE_ACTION_REMOVE;                    \
         aodev->dev = device;                                            \
-        aodev->callback = device_addrm_aocomplete;                      \
+        aodev->callback = device_##type##_rm_aocomplete;                \
         aodev->force = f;                                               \
         libxl__initiate_device_remove(egc, aodev);                      \
                                                                         \
@@ -3617,7 +3641,7 @@ DEFINE_DEVICE_REMOVE(vtpm, destroy, 1)
                                                                         \
         GCNEW(aodev);                                                   \
         libxl__prepare_ao_device(ao, aodev);                            \
-        aodev->callback = device_addrm_aocomplete;                      \
+        aodev->callback = device_add_aocomplete;                        \
         libxl__device_##type##_add(egc, domid, type, aodev);            \
                                                                         \
         return AO_INPROGRESS;                                           \
