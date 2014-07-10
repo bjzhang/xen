@@ -499,6 +499,9 @@ libxl_diskinfo = Struct("diskinfo", [
     ("state", integer),
     ("evtch", integer),
     ("rref", integer),
+    ("param", string),
+    ("dev", string),
+    ("type", string),
     ], dir=DIR_OUT)
 
 libxl_nicinfo = Struct("nicinfo", [
@@ -616,3 +619,40 @@ libxl_event = Struct("event",[
                                  ])),
            ("domain_create_console_available", None),
            ]))])
+
+libxl_snapshot_type = Enumeration("snapshot_type", [
+    (0, "ANY"),
+    (1, "INTERNAL"),
+    (2, "EXTERNAL"),
+    ], init_val = "LIBXL_SNAPSHOT_TYPE_ANY")
+
+libxl_disk_snapshot = Struct("disk_snapshot",[
+    ("device",        string),
+    ("name",          string),
+    ("file",          string),
+    ("format",        libxl_disk_format),
+    ("path",          string),
+    ("type",          libxl_snapshot_type),
+    ])
+
+libxl_domain_snapshot = Struct("domain_snapshot",[
+    ("name",          string),
+    ("description",   string),
+    ("creation_time", uint64),
+    ("memory",        string),
+    ("type",          libxl_snapshot_type),
+    ("running",       bool),
+    ("blocked",       bool),
+    ("paused",        bool),
+    ("shutdown",      bool),
+    ("dying",         bool),
+    ("disks", Array(libxl_disk_snapshot, "num_disks")),
+    ])
+
+libxl_snapshot_op = Enumeration("snapshot_op", [
+    (1, "CREATE"),
+    (2, "DELETE"),
+    (3, "LIST"),
+    (4, "REVERT"),
+    ])
+

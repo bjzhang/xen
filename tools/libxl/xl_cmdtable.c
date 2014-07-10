@@ -491,6 +491,40 @@ struct cmd_spec cmd_table[] = {
       "[options]",
       "-F                      Run in the foreground",
     },
+    { "snapshot-create",
+      &main_snapshot_create, 1, 1,
+      "create domain snapshot from options or config file.",
+      "<ConfigFile> [options] <Domain>",
+      "-n                      domain snapshot name, using epoch seconds if ignoure\n"
+      "-D --disk-only          only do disk snapshot"
+    },
+    { "snapshot-list",
+      &main_snapshot_list, 0, 0,
+      "list snapshot",
+      "[options] <Domain>",
+      "-n                      domain snapshot name\n"
+      "-l --long               list domain snapshot details"
+    },
+    { "snapshot-delete",
+      &main_snapshot_delete, 0, 1,
+      "delete snapshot according to domain snapshot configuration",
+      "[options] <Domain>",
+      "-n                      domain snapshot name"
+    },
+    { "snapshot-revert",
+      &main_snapshot_revert, 0, 1,
+      "revert snapshot",
+      "[options] <Domain>",
+      "-n                      domain snapshot name"
+    },
+#if 0
+    { "hmp",
+      &main_hmp, 0, 1,
+      "test hmp",
+      "<Domain>",
+      ""
+    },
+#endif
 };
 
 int cmdtable_len = sizeof(cmd_table)/sizeof(struct cmd_spec);

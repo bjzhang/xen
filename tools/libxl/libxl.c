@@ -2575,6 +2575,9 @@ int libxl_device_disk_getinfo(libxl_ctx *ctx, uint32_t domid,
                                  libxl__sprintf(gc, "%s/frontend", diskinfo->backend), NULL);
     val = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/frontend-id", diskinfo->backend));
     diskinfo->frontend_id = val ? strtoul(val, NULL, 10) : -1;
+    diskinfo->param = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "%s/params", diskinfo->backend), NULL);
+    diskinfo->dev = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "%s/dev", diskinfo->backend), NULL);
+    diskinfo->type = xs_read(ctx->xsh, XBT_NULL, libxl__sprintf(gc, "%s/type", diskinfo->backend), NULL);
 
     GC_FREE;
     return 0;

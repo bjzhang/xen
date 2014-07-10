@@ -1774,7 +1774,7 @@ const char *libxl__userdata_path(libxl__gc *gc, uint32_t domid,
                      wh, domid, uuid_string, userdata_userid);
 }
 
-static int userdata_delete(libxl__gc *gc, const char *path)
+int libxl__userdata_delete(libxl__gc *gc, const char *path)
 {
     int r;
     r = unlink(path);
@@ -1805,7 +1805,7 @@ void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid)
         LOGE(ERROR, "glob failed for %s", pattern);
 
     for (i=0; i<gl.gl_pathc; i++) {
-        userdata_delete(gc, gl.gl_pathv[i]);
+        libxl__userdata_delete(gc, gl.gl_pathv[i]);
     }
     globfree(&gl);
 out:
@@ -1829,7 +1829,7 @@ int libxl_userdata_store(libxl_ctx *ctx, uint32_t domid,
     }
 
     if (!datalen) {
-        rc = userdata_delete(gc, filename);
+        rc = libxl__userdata_delete(gc, filename);
         goto out;
     }
 
@@ -1874,9 +1874,10 @@ out:
     return rc;
 }
 
+
 int libxl_userdata_retrieve(libxl_ctx *ctx, uint32_t domid,
-                                 const char *userdata_userid,
-                                 uint8_t **data_r, int *datalen_r)
+                            const char *userdata_userid,
+                            uint8_t **data_r, int *datalen_r)
 {
     GC_INIT(ctx);
     const char *filename;

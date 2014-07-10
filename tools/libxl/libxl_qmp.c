@@ -939,6 +939,132 @@ int libxl__qmp_cpu_add(libxl__gc *gc, int domid, int idx)
     return qmp_run_command(gc, domid, "cpu-add", args, NULL, NULL);
 }
 
+//TODO: split this piece of code
+#if 0
+/*
+-> { "execute": "blockdev-snapshot-delete-internal-sync",
+                "arguments": { "device": "ide-hd0",
+                               "name": "snapshot0" }
+   }
+<- { "return": {
+                   "id": "1",
+                   "name": "snapshot0",
+                   "vm-state-size": 0,
+                   "date-sec": 1000012,
+                   "date-nsec": 10,
+                   "vm-clock-sec": 100,
+                   "vm-clock-nsec": 20
+     }
+   }
+ */
+static int qmp_delete_snapshot_internal_callback(libxl__qmp_handler *qmp,
+                                                 const libxl__json_object *response,
+                                                 void *opaque)
+{
+    const libxl__json_object *obj = NULL;
+    const libxl__json_object *label = NULL;
+    libxl_disk_snapshot *snapshot = opaque;
+    int i = 0;
+    int ret = 0;
+
+    for (i = 0; (obj = libxl__json_array_get(response, i)); i++) {
+        if (!libxl__json_object_is_map(obj))
+            continue;
+//        label = libxl__json_map_get("id", obj, JSON_STRING);
+//        snapshot->id = strdup(libxl__json_object_get_string(label));
+        label = libxl__json_map_get("name", obj, JSON_STRING);
+        snapshot->name = strdup(libxl__json_object_get_string(label));
+//        label = libxl__json_map_get("vm-state-size", obj, JSON_INTEGER);
+//        snapshot->vm_state_size = libxl__json_object_get_integer(label);
+//        label = libxl__json_map_get("date-sec", obj, JSON_INTEGER);
+//        snapshot->date_sec = libxl__json_object_get_integer(label);
+//        label = libxl__json_map_get("date-nsec", obj, JSON_INTEGER);
+//        snapshot->date_nsec = libxl__json_object_get_integer(label);
+//        label = libxl__json_map_get("vm-clock-sec", obj, JSON_INTEGER);
+//        snapshot->vm_clock_sec = libxl__json_object_get_integer(label);
+//        label = libxl__json_map_get("vm-clock-nsec", obj, JSON_INTEGER);
+//        snapshot->vm_clock_nsec = libxl__json_object_get_integer(label);
+    };
+    return ret;
+}
+#endif
+
+/*
+   -> { "execute": "transaction",
+        "arguments": { "actions": [
+            { "type": "blockdev-snapshot-sync", "data" : { "device": "ide-hd0",
+                                            "snapshot-file": "/some/place/my-image",
+                                            "format": "qcow2" } },
+            { 'type': 'blockdev-snapshot-internal-sync', 'data' : {
+                                            "device": "ide-hd1",
+                                            "name": "snapshot0" } } ] } }
+            { 'type': 'blockdev-snapshot-internal-sync', 'data' : {
+                                            "device": "ide-hd2",
+                                            "name": "snapshot0" } } ] } }
+   <- { "return": {} }
+ */
+int libxl__qmp_disk_snapshot_transaction(libxl__gc *gc, int domid,
+                                         libxl_disk_snapshot *snapshot, int nb)
+{
+    libxl__json_object *args = NULL;
+    libxl__json_object *types = NULL;
+    libxl__json_object **type = NULL;
+    libxl__json_object **device = NULL;
+    int i;
+
+    type = (libxl__json_object**)calloc(nb, sizeof(libxl__json_object*));
+    device = (libxl__json_object**)calloc(nb, sizeof(libxl__json_object*));
+    types = libxl__json_object_alloc(gc, JSON_ARRAY);
+    for ( i = 0; i < nb; i++ ) {
+        if ( snapshot-> type == LIBXL_SNAPSHOT_TYPE_INTERNAL ) {
+            qmp_parameters_add_string(gc, &type[i], "type", "blockdev-snapshot-internal-sync");
+            qmp_parameters_add_string(gc, &device[i], "device", snapshot[i].device);
+            qmp_parameters_add_string(gc, &device[i], "name", snapshot[i].name);
+            qmp_parameters_common_add(gc, &type[i], "data", device[i]);
+            flexarray_append(types->u.array, (void*)type[i]);
+        } else {
+            qmp_parameters_add_string(gc, &type[i], "type", "blockdev-snapshot-sync");
+            qmp_parameters_add_string(gc, &device[i], "device", snapshot[i].device);
+            qmp_parameters_add_string(gc, &device[i], "snapshot-file", snapshot[i].file);
+            qmp_parameters_add_string(gc, &device[i], "format", libxl_disk_format_to_string(snapshot[i].format));
+            qmp_parameters_common_add(gc, &type[i], "data", device[i]);
+            flexarray_append(types->u.array, (void*)type[i]);
+        }
+    }
+
+    qmp_parameters_common_add(gc, &args, "actions", types);
+    return qmp_run_command(gc, domid, "transaction", args, NULL, NULL);
+}
+
+/*
+-> { "execute": "blockdev-snapshot-delete-internal-sync",
+                "arguments": { "device": "ide-hd0",
+                               "name": "snapshot0" }
+   }
+<- { "return": {
+                   "id": "1",
+                   "name": "snapshot0",
+                   "vm-state-size": 0,
+                   "date-sec": 1000012,
+                   "date-nsec": 10,
+                   "vm-clock-sec": 100,
+                   "vm-clock-nsec": 20
+     }
+   }
+ */
+//caller should ensure that the id and name at lease exist one
+int libxl__qmp_disk_snapshot_delete_internal(libxl__gc *gc, int domid,
+                                             libxl_disk_snapshot *snapshot)
+{
+    libxl__json_object *args = NULL;
+
+    qmp_parameters_add_string(gc, &args, "device", snapshot->device);
+    qmp_parameters_add_string(gc, &args, "name", snapshot->name);
+
+    return qmp_run_command(gc, domid, "blockdev-snapshot-delete-internal-sync",
+                           args, NULL, NULL);
+}
+
 int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
                                const libxl_domain_config *guest_config)
 {

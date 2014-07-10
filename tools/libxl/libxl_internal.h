@@ -996,6 +996,7 @@ _hidden int libxl__domain_resume_device_model(libxl__gc *gc, uint32_t domid);
 _hidden const char *libxl__userdata_path(libxl__gc *gc, uint32_t domid,
                                          const char *userdata_userid,
                                          const char *wh);
+_hidden int libxl__userdata_delete(libxl__gc *gc, const char *path);
 _hidden void libxl__userdata_destroyall(libxl__gc *gc, uint32_t domid);
 
 _hidden int libxl__domain_resume(libxl__gc *gc, uint32_t domid,
@@ -1593,6 +1594,13 @@ _hidden void libxl__qmp_close(libxl__qmp_handler *qmp);
 /* remove the socket file, if the file has already been removed,
  * nothing happen */
 _hidden void libxl__qmp_cleanup(libxl__gc *gc, uint32_t domid);
+_hidden int libxl__qmp_disk_snapshot_transaction(libxl__gc *gc, int domid,
+                                                 libxl_disk_snapshot *snapshot, int nb);
+_hidden int libxl__qmp_disk_snapshot_delete_internal(libxl__gc *gc, int domid,
+                                                     libxl_disk_snapshot *snapshot);
+#if 0
+_hidden int libxl__hmp(libxl__gc *gc, uint32_t domid, const char *hmp, char *hmp_cmd, const char *expect);
+#endif
 
 /* this helper calls qmp_initialize, query_serial and qmp_close */
 _hidden int libxl__qmp_initializations(libxl__gc *gc, uint32_t domid,
@@ -2812,6 +2820,12 @@ _hidden void libxl__domain_save_device_model(libxl__egc *egc,
 
 _hidden const char *libxl__device_model_savefile(libxl__gc *gc, uint32_t domid);
 
+/*----- domain snapshot -----*/
+typedef struct libxl__ao_snapshot libxl__ao_snapshot;
+struct libxl__ao_snapshot {
+    libxl__ao *ao;
+    libxl__ev_child child;
+};
 
 /*
  * Convenience macros.

@@ -404,6 +404,78 @@ out:
     if (ferror(stdout) || fflush(stdout)) { perror("stdout"); exit(-1); }
 }
 
+//TODO: merge with previous two functions
+static yajl_gen_status printf_info_one_json_snapshot(yajl_gen hand, int domid,
+                                                     libxl_domain_snapshot *snapshot)
+{
+    yajl_gen_status s;
+
+    s = yajl_gen_map_open(hand);
+    if (s != yajl_gen_status_ok)
+        goto out;
+
+    s = yajl_gen_string(hand, (const unsigned char *)"domid",
+                        sizeof("domid")-1);
+    if (s != yajl_gen_status_ok)
+        goto out;
+    if (domid != -1)
+        s = yajl_gen_integer(hand, domid);
+    else
+        s = yajl_gen_null(hand);
+    if (s != yajl_gen_status_ok)
+        goto out;
+
+    s = yajl_gen_string(hand, (const unsigned char *)"snapshot",
+                        sizeof("snapshot")-1);
+    if (s != yajl_gen_status_ok)
+        goto out;
+
+    s = libxl_domain_snapshot_gen_json(hand, snapshot);
+    if (s != yajl_gen_status_ok)
+        goto out;
+
+    s = yajl_gen_map_close(hand);
+    if (s != yajl_gen_status_ok)
+        goto out;
+
+out:
+    return s;
+}
+static void printf_info_snapshot(enum output_format output_format,
+                        int domid,
+                        libxl_domain_snapshot *snapshot)
+{
+    const char *buf;
+    libxl_yajl_length len = 0;
+    yajl_gen_status s;
+    yajl_gen hand;
+
+    hand = libxl_yajl_gen_alloc(NULL);
+    if (!hand) {
+        fprintf(stderr, "unable to allocate JSON generator\n");
+        return;
+    }
+
+    s = printf_info_one_json_snapshot(hand, domid, snapshot);
+    if (s != yajl_gen_status_ok)
+        goto out;
+
+    s = yajl_gen_get_buf(hand, (const unsigned char **)&buf, &len);
+    if (s != yajl_gen_status_ok)
+        goto out;
+
+    puts(buf);
+
+out:
+    yajl_gen_free(hand);
+
+    if (s != yajl_gen_status_ok)
+        fprintf(stderr,
+                "unable to format domain config as JSON (YAJL:%d)\n", s);
+
+    if (ferror(stdout) || fflush(stdout)) { perror("stdout"); exit(-1); }
+}
+
 static int do_daemonize(char *name)
 {
     char *fullname;
@@ -1713,6 +1785,82 @@ static void reload_domain_config(uint32_t domid,
         /* Steal allocations */
         memcpy(d_config, &d_config_new, sizeof(libxl_domain_config));
     }
+}
+
+static void parse_domain_snapshot_data(const char *config_source,
+                                       const char *config_data,
+                                       int config_len,
+                                       libxl_domain_snapshot *snapshot,
+                                       int domid)
+
+{
+    const char *buf;
+    XLU_Config *config;
+    XLU_ConfigList *vbds;
+    int e;
+
+    config= xlu_cfg_init(stderr, config_source);
+    if (!config) {
+        fprintf(stderr, "Failed to allocate for configuration\n");
+        exit(1);
+    }
+
+    e= xlu_cfg_readdata(config, config_data, config_len);
+    if (e) {
+        fprintf(stderr, "Failed to parse config: %s\n", strerror(e));
+        exit(1);
+    }
+
+    if (!xlu_cfg_get_string (config, "name", &buf, 0)) {
+        free(snapshot->name);
+        snapshot->name = strdup(buf);
+    }
+
+    if (!xlu_cfg_get_string (config, "description", &buf, 0))
+        snapshot->description = strdup(buf);
+
+    if (!xlu_cfg_get_string (config, "creationtime", &buf, 0))
+        fprintf(stderr, "creation_time should not be determined by user.");
+
+    if (!xlu_cfg_get_string (config, "memory", &buf, 0)) {
+        free(snapshot->memory);
+        if ( !strcmp("yes", buf) ) {
+            snapshot->memory = libxl_snapshot_save_path(ctx, domid, snapshot);
+        } else {
+            snapshot->memory = strdup(buf);
+        }
+    }
+
+    if (!xlu_cfg_get_list (config, "disk", &vbds, 0, 0)) {
+        snapshot->num_disks = 0;
+        snapshot->disks = NULL;
+        while ((buf = xlu_cfg_get_listitem (vbds, snapshot->num_disks)) != NULL) {
+            libxl_device_disk disk;
+            libxl_disk_snapshot *disk_snapshot;
+            char *buf2 = strdup(buf);
+
+            snapshot->disks = (libxl_disk_snapshot*) realloc(snapshot->disks, sizeof (libxl_disk_snapshot) * (snapshot->num_disks + 1));
+            disk_snapshot = snapshot->disks + snapshot->num_disks;
+            libxl_disk_snapshot_init(disk_snapshot);
+            parse_disk_config(&config, buf2, &disk);
+            disk_snapshot->device = strdup(disk.vdev);
+            if ( disk.pdev_path && strcmp(disk.pdev_path, "null") != 0 ) {
+                disk_snapshot->file = strdup(disk.pdev_path);
+                disk_snapshot->type = LIBXL_SNAPSHOT_TYPE_EXTERNAL;
+            } else {
+                disk_snapshot->type = LIBXL_SNAPSHOT_TYPE_INTERNAL;
+            }
+            disk_snapshot->format = disk.format;
+            //TODO: debug code.
+            fprintf(stderr, " %10s%10s%10s%-30s\n", disk_snapshot->device?:"-",
+                   libxl_disk_format_to_string(disk_snapshot->format),
+                   libxl_snapshot_op_to_string(disk_snapshot->type),
+                   disk_snapshot->file?:"-");
+            free(buf2);
+            snapshot->num_disks++;
+        }
+    }
+    xlu_cfg_destroy(config);
 }
 
 /* Returns 1 if domain should be restarted,
@@ -3397,7 +3545,7 @@ static int save_domain(uint32_t domid, const char *filename, int checkpoint,
     else
         libxl_domain_destroy(ctx, domid, 0);
 
-    exit(rc < 0 ? 1 : 0);
+    return rc;
 }
 
 static pid_t create_migration_child(const char *rune, int *send_fd,
@@ -3930,6 +4078,7 @@ int main_save(int argc, char **argv)
     int checkpoint = 0;
     int leavepaused = 0;
     int opt;
+    int rc;
 
     SWITCH_FOREACH_OPT(opt, "cp", NULL, "save", 2) {
     case 'c':
@@ -3950,8 +4099,8 @@ int main_save(int argc, char **argv)
     if ( argc - optind >= 3 )
         config_filename = argv[optind + 2];
 
-    save_domain(domid, filename, checkpoint, leavepaused, config_filename);
-    return 0;
+    rc = save_domain(domid, filename, checkpoint, leavepaused, config_filename);
+    exit(rc < 0 ? 1 : 0);
 }
 
 int main_migrate(int argc, char **argv)
@@ -7179,6 +7328,372 @@ int main_devd(int argc, char **argv)
 
 out:
     return ret;
+}
+
+int main_snapshot_create(int argc, char **argv)
+{
+    uint32_t domid;
+    int opt;
+    int ret;
+    int rc = 0;
+    char *config_file = NULL;
+    libxl_domain_snapshot snapshot;
+    int disk_only = 0;
+    void *config_data = 0;
+    int config_len = 0;
+    struct timeval timeval;
+    libxl_dominfo info;
+    int paused = 1;
+    static struct option opts[] = {
+        {"disk-only", 0, 0, 'D'},
+        COMMON_LONG_OPTS,
+        {0, 0, 0, 0}
+    };
+
+    libxl_domain_snapshot_init(&snapshot);
+
+    if (argv[1] && argv[1][0] != '-' && !strchr(argv[1], '=')) {
+        config_file = strdup(argv[1]);
+        argc--; argv++;
+    }
+
+    SWITCH_FOREACH_OPT(opt, "Dn:", opts, "snapshot-create", 1) {
+    case 'n':
+        snapshot.name = strdup(optarg);
+        break;
+    case 'D':
+        disk_only = 1;
+        break;
+    }
+
+    domid = find_domain(argv[optind++]);
+
+    gettimeofday(&timeval, NULL);
+    if ( !snapshot.name ) {
+        snapshot.name = (char*)malloc(sizeof(time_t) * 8 + 1);
+        sprintf(snapshot.name, "%ld", timeval.tv_sec);
+    }
+    snapshot.creation_time = timeval.tv_sec;
+    snapshot.type = LIBXL_SNAPSHOT_TYPE_INTERNAL;
+    if ( config_file ) {
+        ret = libxl_read_file_contents(ctx, config_file,
+                                       &config_data, &config_len);
+        if (ret) {
+            fprintf(stderr, "Failed to read config file: %s: %s\n",
+                           config_file, strerror(errno));
+            rc = ERROR_FAIL;
+            goto out;
+        }
+        parse_domain_snapshot_data(config_file, config_data, config_len, &snapshot, domid);
+    } else {
+        if ( !disk_only )
+            snapshot.memory = libxl_snapshot_save_path(ctx, domid, &snapshot);
+    }
+    rc = libxl_disk_to_snapshot(ctx, domid, &snapshot.disks, &snapshot.num_disks);
+    if ( rc )
+        goto out;
+    libxl_set_disk_snapshot_name(&snapshot);
+    libxl_set_disk_snapshot_type(&snapshot);
+
+    if ( snapshot.memory && disk_only )
+        fprintf(stderr, "error: --disk-only flag conflict with memory save path in configuration\n");
+
+    rc = libxl_domain_info(ctx, &info, domid);
+    if (rc == ERROR_INVAL) {
+        fprintf(stderr, "Error: Domain \'%s\' does not exist.\n",
+            argv[optind]);
+        rc = -rc;
+        goto out;
+    }
+    if (rc) {
+        fprintf(stderr, "libxl_domain_info failed (code %d).\n", rc);
+        rc = -rc;
+        goto out;
+    }
+    snapshot.running = info.running;
+    snapshot.blocked = info.blocked;
+    snapshot.paused = info.paused;
+    snapshot.shutdown = info.shutdown;
+    snapshot.dying = info.dying;
+    libxl_dominfo_dispose(&info);
+
+    //TODO is it necessary?
+    if ( snapshot.shutdown || snapshot.dying )
+        fprintf(stderr, "do not snapshot when domain is shutdown or dying\n");
+
+    if ( dryrun_only ) {
+        printf_info_snapshot(OUTPUT_FORMAT_JSON, domid, &snapshot);
+        goto out;
+    }
+
+    check_domain_snapshot_directory(ctx, domid);
+    if ( snapshot.memory ) {
+        rc = save_domain(domid, snapshot.memory, 0, paused, NULL);
+        if ( rc )
+            goto out;
+    } else {
+        if ( !snapshot.paused && paused )
+            libxl_domain_pause(ctx, domid);
+    }
+
+    rc = libxl_disk_snapshot_create(ctx, domid, snapshot.disks, snapshot.num_disks);
+    if ( rc )
+        goto out_save;
+
+    rc = libxl_store_dom_snapshot_conf(ctx, domid, &snapshot);
+    if ( rc ) {
+        rc = libxl_disk_snapshot_delete(ctx, domid, snapshot.disks, snapshot.num_disks);
+    }
+
+out_save:
+    if ( rc )
+        libxl_domain_snapshot_delete_save(ctx, &snapshot);
+
+    if ( !snapshot.paused && paused )
+        libxl_domain_unpause(ctx, domid);
+out:
+    libxl_domain_snapshot_dispose(&snapshot);
+    return rc;
+}
+
+//TODO: need libxl_snapshot_delete();
+//TODO: do i need a lock?
+int main_snapshot_delete(int argc, char **argv)
+{
+    uint32_t domid;
+    int opt;
+    libxl_domain_snapshot snapshot;
+    int rc = 0;
+
+    libxl_domain_snapshot_init(&snapshot);
+    SWITCH_FOREACH_OPT(opt, "n:", NULL, "snapshot-delete", 1) {
+    case 'n':
+        snapshot.name = strdup(optarg);
+        break;
+    }
+
+    if ( !snapshot.name ) {
+        help("snapshot-delete");
+        rc = 1;
+        goto out;
+    }
+
+    domid = find_domain(argv[optind]);
+    rc = libxl_load_dom_snapshot_conf(ctx, domid, &snapshot);
+    if ( rc ) {
+        fprintf(stderr, "could not delete snapshot without configuration file\n");
+        goto out;
+    }
+
+    if ( libxl_disk_to_snapshot(ctx, domid, &snapshot.disks, &snapshot.num_disks) ) {
+        rc = ERROR_FAIL;
+        goto out_conf;
+    }
+
+    if ( snapshot.memory ) {
+        rc = libxl_domain_snapshot_delete_save(ctx, &snapshot);
+        if ( rc )
+            goto out_conf;
+    }
+
+    if ( libxl_disk_snapshot_delete(ctx, domid, snapshot.disks, snapshot.num_disks) < 0 ) {
+        rc = ERROR_FAIL;
+        goto out_delete;
+    }
+
+    rc = libxl_delete_dom_snapshot_conf(ctx, domid, &snapshot);
+    if ( !rc )
+        goto out_conf;
+
+out_delete:
+    fprintf(stderr, "fail during delete snapshot, domain snapshot status might be wrong\n");
+out_conf:
+    libxl_domain_snapshot_dispose(&snapshot);
+out:
+    return rc;
+}
+
+int main_snapshot_list(int argc, char **argv)
+{
+    uint32_t domid;
+    int opt;
+    int rc = 0;
+    int nb;
+    int i, j;
+    int details = 0;
+    char *name = NULL;
+    int output = 0;
+    libxl_domain_snapshot *snapshot = NULL;
+    libxl_domain_snapshot *temp = NULL;
+    libxl_domain_snapshot **sort = NULL;
+    libxl_disk_snapshot *disk= NULL;
+    char timestr[40];
+    struct tm time_info;
+    const char *format;
+
+    static struct option opts[] = {
+        {"long", 0, 0, 'l'},
+        COMMON_LONG_OPTS,
+        {0,0,0,0}
+    };
+
+    SWITCH_FOREACH_OPT(opt, "ln:", opts, "snapshot-list", 1) {
+    case 'l':
+        details = 1;
+        break;
+    case 'n':
+        name = optarg;
+        break;
+    }
+
+    domid = find_domain(argv[optind]);
+
+    snapshot = libxl_list_dom_snapshot(ctx, domid, &nb);
+    sort = malloc(sizeof(sort) * nb);
+    for ( i = 0; i < nb; i++ ) {
+        sort[i] = &snapshot[i];
+    }
+    for ( i = 0; i < nb; i++ ) {
+        for ( j = i; j < nb; j++ ) {
+            if ( sort[i]->creation_time > sort[j]->creation_time ) {
+                temp = sort[i];
+                sort[i] = sort[j];
+                sort[j] = temp;
+            }
+        }
+    }
+    for ( i = 0; i < nb; i++ ) {
+        printf("---------------------------------------------------------------------\n");
+        printf("%-14s%-30s%26s%6s%10s\n", "TAG", "NAME", "DATE", "STATE",
+               "DISK ONLY");
+        if ( name ) {
+            if ( !strcmp(name, sort[i]->name) )
+                output = 1;
+            else
+                output = 0;
+
+        } else {
+            output = 1;
+        }
+
+        if ( output ) {
+            localtime_r((time_t*)&sort[i]->creation_time, &time_info);
+            strftime(timestr, sizeof(timestr), "%Y-%m-%d %H:%M:%S %z",
+                    &time_info);
+            printf("%-14lu%-30s%26s%2c%c%c%c%c%10s\n", sort[i]->creation_time,
+                   sort[i]->name, timestr,
+                   sort[i]->running ? 'r' : '-',
+                   sort[i]->blocked ? 'b' : '-',
+                   sort[i]->paused ? 'p' : '-',
+                   sort[i]->shutdown ? 's' : '-',
+                   sort[i]->dying ? 'd' : '-',
+                   sort[i]->memory?"No":"Yes");
+            if ( details ) {
+                printf(" DESCRIPTION\n");
+                printf(" %s\n", sort[i]->description?:"");
+                printf(" DISK\n");
+                printf(" %10s%14s%10s%-30s\n", "DEVICE", "NAME", "FORMAT",
+                       "FILE");
+                for ( j = 0; j < sort[i]->num_disks; j++ ) {
+                    disk = &sort[i]->disks[j];
+                    format = libxl_disk_format_to_string(disk->format);
+                    printf(" %10s%14s%10s %-29s\n", disk->device?:"-",
+                           disk->name?:"-",
+                           libxl_disk_format_to_string(disk->format),
+                           disk->file?:"-");
+                }
+            }
+        }
+        libxl_domain_snapshot_dispose(sort[i]);
+    }
+    free(sort);
+    free(snapshot);
+
+    return rc;
+}
+
+int main_snapshot_revert(int argc, char **argv)
+{
+    struct domain_create dom_info;
+    int paused = 0, debug = 0, daemonize = 1, monitor = 1,
+        console_autoconnect = 0, vnc = 0, vncautopass = 0;
+    int opt, rc = 0;
+    static struct option opts[] = {
+        {"vncviewer", 0, 0, 'V'},
+        {"vncviewer-autopass", 0, 0, 'A'},
+        COMMON_LONG_OPTS,
+        {0, 0, 0, 0}
+    };
+    libxl_domain_snapshot snapshot;
+    uint32_t domid;
+
+    libxl_domain_snapshot_init(&snapshot);
+    SWITCH_FOREACH_OPT(opt, "FhcpdeVAn:", opts, "snapshot-revert", 1) {
+    case 'c':
+        console_autoconnect = 1;
+        break;
+    case 'p':
+        paused = 1;
+        break;
+    case 'd':
+        debug = 1;
+        break;
+    case 'F':
+        daemonize = 0;
+        break;
+    case 'e':
+        daemonize = 0;
+        monitor = 0;
+        break;
+    case 'V':
+        vnc = 1;
+        break;
+    case 'A':
+        vnc = vncautopass = 1;
+        break;
+    case 'n':
+        snapshot.name = strdup(optarg);
+    }
+
+    domid = find_domain(argv[optind]);
+
+    libxl_load_dom_snapshot_conf(ctx, domid, &snapshot);
+    libxl_disk_to_snapshot(ctx, domid, &snapshot.disks, &snapshot.num_disks);
+
+    if ( !snapshot.memory ) {
+        fprintf(stderr, "for internal snapshot without memory save, please call"
+                " qemu-img directly\n");
+        goto out;
+    }
+
+    rc = libxl_domain_destroy(ctx, domid, 0);
+    if (rc) {
+        fprintf(stderr,"destroy failed (rc=%d)\n",rc);
+        goto out;
+    }
+
+    rc = libxl_disk_snapshot_revert(ctx, domid, snapshot.disks, snapshot.num_disks);
+    if (rc) {
+        fprintf(stderr,"disk revert failed (rc=%d)\n",rc);
+        goto out;
+    }
+
+    memset(&dom_info, 0, sizeof(dom_info));
+    dom_info.debug = debug;
+    dom_info.daemonize = daemonize;
+    dom_info.monitor = monitor;
+    dom_info.paused = paused;
+    dom_info.restore_file = snapshot.memory;
+    dom_info.migrate_fd = -1;
+    dom_info.vnc = vnc;
+    dom_info.vncautopass = vncautopass;
+    dom_info.console_autoconnect = console_autoconnect;
+
+    rc = create_domain(&dom_info);
+
+out:
+    libxl_domain_snapshot_dispose(&snapshot);
+    return rc;
 }
 
 /*

@@ -110,6 +110,11 @@ int main_loadpolicy(int argc, char **argv);
 int main_remus(int argc, char **argv);
 #endif
 int main_devd(int argc, char **argv);
+int main_snapshot_create(int argc, char **argv);
+int main_snapshot_delete(int argc, char **argv);
+int main_snapshot_list(int argc, char **argv);
+int main_snapshot_revert(int argc, char **argv);
+int main_hmp(int argc, char **argv);
 
 void help(const char *command);
 
